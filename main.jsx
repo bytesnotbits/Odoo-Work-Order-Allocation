@@ -143,10 +143,91 @@ export default function App() {
   function lockWorkOrder(wo) {
     const gm = grouped.get(wo);
     if (!gm) return;
-    // Over-allocation guard
+
+    const issues = [];
+
+    // 1) Over-allocation & Unallocated checks
     for (const [code] of gm) {
       const s = getItemState(wo, code);
-      if (s.allocatedSum > s.totalAvailable) { alert(`Over-allocated on [${code}]: allocations exceed available. Engineering review required.`); return; }
+      if (s.allocatedSum > s.totalAvailable) {
+        issues.push(`Over-allocated on [${code}]: allocations (${s.allocatedSum}) exceed available (${s.totalAvailable}).`);
+      }
+      if (s.remaining > 0) {
+        issues.push(`Unallocated material on [${code}]: remaining ${s.remaining}.`);
+      }
+    }
+
+    // 2) Overlap & span-bound checks for reel pieces (per reel)
+    for (const [code] of gm) {
+      const k = keyOf(wo, code);
+      const rec = allocState[k] || { allocations: [], reels: {} };
+
+      // group pieces by reel
+      const byReel = {};
+      for (const a of rec.allocations || []) {
+        if (a.type !== 'reel') continue;
+        const reel = a.reelSerial || '(no reel)';
+        const s = Math.min(a.outer, a.inner);
+        const e = Math.max(a.outer, a.inner);
+        if (!byReel[reel]) byReel[reel] = [];
+        byReel[reel].push([s, e]);
+      }
+
+      for (const reel of Object.keys(byReel)) {
+        const intervals = byReel[reel].sort((x, y) => x[0] - y[0] || x[1] - y[1]);
+        for (let i = 1; i < intervals.length; i++) {
+          const prev = intervals[i - 1];
+          const curr = intervals[i];
+          // touching endpoints allowed => overlap only if curr.start < prev.end
+          if (curr[0] < prev[1]) {
+            issues.push(`Overlap on [${code}] reel ${reel}: [${prev[0]}–${prev[1]}] overlaps [${curr[0]}–${curr[1]}].`);
+          }
+        }
+
+        // span bounds check if a total span saved for this reel
+        const rs = (rec.reels || {})[reel];
+        if (rs && Number.isFinite(Number(rs.start)) && Number.isFinite(Number(rs.end))) {
+          const lo = Math.min(Number(rs.start), Number(rs.end));
+          const hi = Math.max(Number(rs.start), Number(rs.end));
+          for (const [s, e] of intervals) {
+            if (s < lo || e > hi) {
+              issues.push(`Piece outside saved span on [${code}] reel ${reel}: [${s}–${e}] not within [${lo}–${hi}].`);
+            }
+          }
+        }
+      }
+    }
+
+    // 3) Asset IDs guard
+    for (const [code] of gm) {
+      const k = keyOf(wo, code);
+      const state = allocState[k] || { allocations: [], assets: {} };
+      for (const a of state.allocations) {
+        if (!state.assets[a.id]) {
+          issues.push(`Missing Asset ID on [${code}] for allocation ${a.id}.`);
+        }
+      }
+    }
+
+    if (issues.length > 0) {
+      alert(`Cannot complete WO ${wo} due to:
+
+• ${issues.join('
+• ')}`);
+      return;
+    }
+
+    // If no issues, lock work order
+    setAllocState(prev => {
+      const next = { ...prev };
+      for (const [code] of gm) {
+        const k = keyOf(wo, code);
+        if (next[k]) next[k] = { ...next[k], locked: true };
+      }
+      return next;
+    });
+    alert(`WO ${wo} marked complete.`);
+  }
     }
     // Asset IDs guard
     let allHaveAssets = true;
@@ -309,6 +390,7 @@ function WOView({ wo, grouped, getItemState, upsertAllocation, removeAllocation,
     const s = getItemState(wo, p.code);
     return s.allocatedSum > s.totalAvailable;
   });
+  const anyUnallocated = products.some((p) => getItemState(wo, p.code).remaining > 0);
 
   return (
     <div className="space-y-6">
@@ -332,11 +414,11 @@ function WOView({ wo, grouped, getItemState, upsertAllocation, removeAllocation,
       ))}
 
       <div className="flex items-center gap-3 pt-2 border-t">
-        {anyOverAllocated && (
-          <Badge><AlertTriangle className="inline w-4 h-4 mr-1" /> Over-allocated: engineering review required</Badge>
+        {(anyOverAllocated || anyUnallocated) && (
+          <Badge><AlertTriangle className="inline w-4 h-4 mr-1" /> Open issues: resolve before completion</Badge>
         )}
         {allAllocated ? (
-          <Badge><CheckCircle2 className="inline w-4 h-4 mr-1" /> Engineering: All material allocated</Badge>
+          <Badge><CheckCircle2 className="inline w-4 h-4 mr-1" /> Engineering: All material allocated (no unallocated)</Badge>
         ) : (
           <Badge><AlertTriangle className="inline w-4 h-4 mr-1" /> Engineering: Unallocated material remains</Badge>
         )}
@@ -346,9 +428,16 @@ function WOView({ wo, grouped, getItemState, upsertAllocation, removeAllocation,
           <Badge><AlertTriangle className="inline w-4 h-4 mr-1" /> Accounting: Asset IDs missing</Badge>
         )}
         <button
-          onClick={() => { if (anyOverAllocated) { alert('Over-allocated: engineering review required before completion.'); return; } lockWorkOrder(wo); }}
-          disabled={anyOverAllocated}
-          title={anyOverAllocated ? 'Resolve over-allocations before completion' : ''}
+          onClick={() => {
+            if (anyOverAllocated || anyUnallocated) {
+              // Let lockWorkOrder compose the full reasons list
+              lockWorkOrder(wo);
+              return;
+            }
+            lockWorkOrder(wo);
+          }}
+          disabled={anyOverAllocated || anyUnallocated}
+          title={(anyOverAllocated || anyUnallocated) ? 'Resolve issues before completion' : ''}
           className="ml-auto px-3 py-2 rounded-xl border disabled:opacity-50"
         >
           Mark complete
@@ -635,6 +724,13 @@ function __test_span_bounds_and_reel_scoping() {
   __dev_assert('touching endpoints allowed', overlaps([100,200],[200,250]) === false);
   // cross-reel pieces should be considered independent (scoped by reel)
   const pieceA = {reel:'R1', seg:[10170,10166]};
+  const pieceB = {reel:'R2', seg:[10170,10166]};
+  __dev_assert('same segment different reels ok', pieceA.reel !== pieceB.reel);
+  // detector sanity: [0,10] & [9,12] overlap; [10,20] touches but ok
+  const sorted = [[0,10],[10,20],[9,12]].sort((x,y)=>x[0]-y[0]||x[1]-y[1]);
+  const hasOverlap = (()=>{ let hit=false; for(let i=1;i<sorted.length;i++){ if(sorted[i][0] < sorted[i-1][1]) { hit=true; break; } } return hit; })();
+  __dev_assert('overlap detector finds conflict', hasOverlap === true);
+};
   const pieceB = {reel:'R2', seg:[10170,10166]};
   __dev_assert('same segment different reels ok', pieceA.reel !== pieceB.reel);
 }
