@@ -27,6 +27,7 @@ export default function App() {
 
   const workOrders = useMemo(() => Array.from(grouped.keys()).sort(), [grouped]);
   const activeWO = selectedWO || workOrders[0] || "";
+  
 
   function handleFile(e) {
     const file = e.target.files?.[0];
@@ -106,8 +107,8 @@ export default function App() {
                         "w-full px-3 py-2 rounded-lg transition",
                         "focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-900",
                         tab === "engineering"
-                          ? "bg-white text-slate-900 shadow border border-slate-200"
-                          : "bg-transparent text-slate-700 hover:bg-white/60 border border-transparent"
+                          ? "bg-white text-slate-900 font-semibold border border-blue-600 ring-2 ring-blue-600/75"
+                          : "bg-white text-slate-700 hover:bg-white/80 border border-slate-200"
                       ].join(" ")}
                     >
                       Engineer
@@ -121,8 +122,8 @@ export default function App() {
                         "w-full px-3 py-2 rounded-lg transition",
                         "focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-900",
                         tab === "accounting"
-                          ? "bg-white text-slate-900 shadow border border-slate-200"
-                          : "bg-transparent text-slate-700 hover:bg-white/60 border border-transparent"
+                          ? "bg-white text-slate-900 font-semibold border border-blue-600 ring-2 ring-blue-600/75"
+                          : "bg-white text-slate-700 hover:bg-white/80 border border-slate-200"
                       ].join(" ")}
                     >
                       Accountant
