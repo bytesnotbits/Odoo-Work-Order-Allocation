@@ -1,8 +1,275 @@
-export default function ProductCard({ title = 'Product', children, className = '' }) {
+import { useState } from "react";
+import { ALLOCATION_OPTIONS } from "../lib/data";
+import Badge from "./Badge";
+import { Plus, Trash2, Ruler } from "lucide-react";
+
+export default function ProductCard({
+  wo, product, getItemState,
+  upsertAllocation, removeAllocation, setAssetId,
+  setReelSpan, getReelSpan, listReels, tab, locked
+}) {
+  const { base, extra, totalAvailable, allocatedSum, remaining } = getItemState(wo, product.code);
+  const [allocQty, setAllocQty] = useState("");
+  const [allocId, setAllocId] = useState("");
+  const [allocCategory, setAllocCategory] = useState(ALLOCATION_OPTIONS[0]);
+  const [allocCategoryCustom, setAllocCategoryCustom] = useState("");
+  const [outer, setOuter] = useState("");
+  const [inner, setInner] = useState("");
+  const [reelSerial, setReelSerial] = useState("");
+  const [spanStartInput, setSpanStartInput] = useState("");
+  const [spanEndInput, setSpanEndInput] = useState("");
+
+  if (!base) return null;
+
+  const reelFootage = Math.abs((Number(inner) || 0) - (Number(outer) || 0));
+  const currentSpan = reelSerial ? getReelSpan(wo, product.code, reelSerial) : { start: "", end: "" };
+  const spanStartNum = isFinite(Number(currentSpan.start)) ? Number(currentSpan.start) : null;
+  const spanEndNum = isFinite(Number(currentSpan.end)) ? Number(currentSpan.end) : null;
+  const spanMin = spanStartNum !== null && spanEndNum !== null ? Math.min(spanStartNum, spanEndNum) : null;
+  const spanMax = spanStartNum !== null && spanEndNum !== null ? Math.max(spanStartNum, spanEndNum) : null;
+
+  const finalCategory = () => (allocCategory === "__custom__" ? (allocCategoryCustom || "Custom") : allocCategory);
+
+  function addRegular() {
+    const qty = Number(allocQty);
+    if (!qty || qty <= 0) return alert("Enter a positive quantity");
+    if (qty > remaining) return alert("Quantity exceeds remaining available");
+    upsertAllocation(wo, product.code, { type: "regular", qty, allocationId: allocId || "", allocationCategory: finalCategory(), reelSerial });
+    setAllocQty(""); setAllocId(""); setReelSerial(""); setAllocCategory(ALLOCATION_OPTIONS[0]); setAllocCategoryCustom("");
+  }
+
+  function addReelPiece() {
+    if (!reelSerial) return alert("Enter a Reel/Serial Number for this piece");
+    if (reelFootage <= 0) return alert("Enter valid outer/inner to compute footage");
+    if (reelFootage > remaining) return alert("Footage exceeds remaining available");
+
+    const s = Math.min(Number(outer), Number(inner));
+    const e = Math.max(Number(outer), Number(inner));
+    const hasSpan = (spanMin !== null && spanMax !== null);
+    if (hasSpan) {
+      if (s < spanMin || e > spanMax) return alert("Piece is outside the defined span range");
+      for (const a of extra.allocations) {
+        if (a.type !== "reel" || a.outer == null || a.inner == null) continue;
+        if ((a.reelSerial || "") !== reelSerial) continue;
+        const es = Math.min(a.outer, a.inner);
+        const ee = Math.max(a.outer, a.inner);
+        if (Math.min(e, ee) > Math.max(s, es)) return alert(`Overlap with existing piece [${es}–${ee}]`);
+      }
+    }
+    upsertAllocation(wo, product.code, {
+      type: "reel", outer: Number(outer), inner: Number(inner), footage: reelFootage,
+      allocationId: allocId || "", allocationCategory: finalCategory(), reelSerial
+    });
+    setOuter(""); setInner(""); setAllocId(""); setReelSerial(""); setAllocCategory(ALLOCATION_OPTIONS[0]); setAllocCategoryCustom("");
+  }
+
   return (
-    <div className={`rounded-xl border p-4 shadow-sm ${className}`}>
-      <h3 className="text-sm font-semibold mb-2">{title}</h3>
-      <div className="text-sm text-gray-600">{children ?? 'Details…'}</div>
+    <div className="border rounded-2xl p-4">
+      <div className="flex-1">
+        <div className="font-semibold text-base md:text-lg">[{product.code}] {product.desc || "Unnamed"}</div>
+        <div className="text-sm text-gray-600 flex flex-wrap gap-3 mt-1">
+          <span>Posted: <b>{product.posted}</b></span>
+          <span>Returned: <b>{product.returned}</b></span>
+          <span>Total available: <b>{totalAvailable}</b></span>
+          <span>Allocated: <b>{allocatedSum}</b></span>
+          <span className={remaining === 0 ? "text-green-600" : "text-amber-600"}>Unallocated: <b>{remaining}</b></span>
+          {product.isCable && <Badge>Reel/Cable</Badge>}
+          {allocatedSum > totalAvailable && <span className="text-red-600 font-medium">Over-allocated — adjust allocations</span>}
+        </div>
+      </div>
+
+      {tab === "engineering" && (
+        <div className="mt-4 grid md:grid-cols-2 gap-4">
+          {/* Add allocation */}
+          <div className="bg-gray-50 rounded-xl p-3 border">
+            <div className="font-medium mb-2">Add allocation</div>
+
+            {!product.isCable && (
+              <div className="space-y-2">
+                <label className="block text-sm">Quantity</label>
+                <input type="number" min={0} step={1} className="w-full border rounded-xl p-2" value={allocQty} onChange={(e) => setAllocQty(e.target.value)} />
+                <label className="block text-sm">Allocation notes (optional)</label>
+                <input className="w-full border rounded-xl p-2" value={allocId} onChange={(e) => setAllocId(e.target.value)} placeholder="e.g., AERIAL-FIBER-01" />
+                <label className="block text-sm mt-2">Allocation Category</label>
+                <div className="flex gap-2">
+                  <select className="border rounded-xl p-2" value={allocCategory} onChange={(e) => setAllocCategory(e.target.value)}>
+                    {ALLOCATION_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
+                    <option value="__custom__">Custom…</option>
+                  </select>
+                  {allocCategory === "__custom__" && (
+                    <input className="flex-1 border rounded-xl p-2" placeholder="Enter custom category" value={allocCategoryCustom} onChange={(e) => setAllocCategoryCustom(e.target.value)} />
+                  )}
+                </div>
+                <label className="block text-sm mt-2">Reel/Serial Number (optional)</label>
+                <input className="w-full border rounded-xl p-2" value={reelSerial} onChange={(e) => setReelSerial(e.target.value)} placeholder="e.g., REEL-12345 or SN-0001" />
+                <button
+                  type="button"
+                  onClick={addRegular}
+                  className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border bg-white text-gray-700 shadow-sm
+                             hover:bg-gray-50 active:bg-gray-100
+                             focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50"
+                  aria-label="Add Span"
+                >
+                  <Plus className="w-4 h-4" aria-hidden="true" />
+                  <span className="font-medium">Add Span</span>
+                </button>              </div>
+            )}
+
+            {product.isCable && (
+              <div className="space-y-2">
+                {/* Reel & span */}
+                <div className="bg-white border rounded-xl p-3">
+                  <div className="font-medium mb-1">Reel & span (optional)</div>
+                  <div className="grid md:grid-cols-3 gap-2">
+                    <div>
+                      <label className="block text-sm">Reel/Serial Number</label>
+                      <input className="w-full border rounded-xl p-2" value={reelSerial} onChange={(e)=> setReelSerial(e.target.value)} placeholder="REEL-XXXXX" />
+                      {listReels(wo, product.code).length > 0 && (
+                        <div className="text-xs text-gray-600 mt-1">Known reels: {listReels(wo, product.code).join(", ")}</div>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-sm">Span start sequence</label>
+                      <input type="number" className="w-full border rounded-xl p-2" value={spanStartInput} onChange={(e)=>setSpanStartInput(e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="block text-sm">Span end sequence</label>
+                      <input type="number" className="w-full border rounded-xl p-2" value={spanEndInput} onChange={(e)=>setSpanEndInput(e.target.value)} />
+                    </div>
+                  </div>
+                  <div className="mt-2">
+                    <button disabled={locked} onClick={()=>{
+                      if (!reelSerial) return alert("Enter reel/serial to save a span");
+                      const s = Number(spanStartInput); const e = Number(spanEndInput);
+                      if (!isFinite(s) || !isFinite(e)) return alert("Enter numeric span start/end");
+                      setReelSpan(wo, product.code, reelSerial, s, e);
+                    }} className="px-3 py-1 rounded-lg border">Save span</button>
+                  </div>
+                  {/* Coverage summary */}
+                  {(() => {
+                    if (!reelSerial) return null;
+                    const rs = getReelSpan(wo, product.code, reelSerial);
+                    const s = Number(rs?.start), e = Number(rs?.end);
+                    if (isFinite(s) && isFinite(e)) {
+                      const total = Math.abs(e - s);
+                      const covered = extra.allocations
+                        .filter(a => a.type === "reel" && (a.reelSerial || "") === reelSerial && a.outer != null && a.inner != null)
+                        .reduce((sum, a) => sum + Math.abs(a.outer - a.inner), 0);
+                      const remainingSpan = Math.max(total - covered, 0);
+                      return <div className="text-sm text-gray-600 mt-2">[{reelSerial}] Span total: <b>{total}</b> | Covered: <b>{covered}</b> | Remaining: <b>{remainingSpan}</b></div>;
+                    }
+                    return <div className="text-sm text-gray-500 mt-2">No span saved for this reel yet.</div>;
+                  })()}
+                </div>
+
+                {/* Reel piece */}
+                <div className="flex items-center gap-2"><Ruler className="w-4 h-4" /> <div className="font-medium">Reel piece</div></div>
+                <label className="block text-sm">Outer Sequence</label>
+                <input type="number" className="w-full border rounded-xl p-2" value={outer} onChange={(e) => setOuter(e.target.value)} />
+                <label className="block text-sm">Inner Sequence</label>
+                <input type="number" className="w-full border rounded-xl p-2" value={inner} onChange={(e) => setInner(e.target.value)} />
+                <div className="text-sm text-gray-600">Footage = |Inner − Outer| → <b>{reelFootage}</b></div>
+                <label className="block text-sm">Allocation notes (optional)</label>
+                <input className="w-full border rounded-xl p-2" value={allocId} onChange={(e) => setAllocId(e.target.value)} placeholder="e.g., AERIAL-SPAN-12" />
+                <label className="block text-sm mt-2">Allocation Category</label>
+                <div className="flex gap-2">
+                  <select className="border rounded-xl p-2" value={allocCategory} onChange={(e) => setAllocCategory(e.target.value)}>
+                    {ALLOCATION_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
+                    <option value="__custom__">Custom…</option>
+                  </select>
+                  {allocCategory === "__custom__" && (
+                    <input className="flex-1 border rounded-xl p-2" placeholder="Enter custom category" value={allocCategoryCustom} onChange={(e) => setAllocCategoryCustom(e.target.value)} />
+                  )}
+                </div>
+                <label className="block text-sm mt-2">Reel/Serial Number <span className="text-red-500">*</span></label>
+                <input className="w-full border rounded-xl p-2" value={reelSerial} onChange={(e) => setReelSerial(e.target.value)} placeholder="REEL-XXXXX" />
+                <button disabled={locked} onClick={addReelPiece} className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-gray-900 text-white disabled:opacity-50"><Plus className="w-4 h-4" /> Add piece</button>
+              </div>
+            )}
+          </div>
+
+          {/* Allocations table */}
+          <div className="bg-gray-50 rounded-xl p-3 border overflow-x-auto">
+            <div className="font-medium mb-2">Allocations</div>
+            {extra.allocations.length === 0 ? (
+              <div className="text-sm text-gray-600">No allocations yet.</div>
+            ) : (
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr className="text-left text-gray-600">
+                    <th className="py-1 pr-3">Type</th>
+                    <th className="py-1 pr-3">Qty/Footage</th>
+                    <th className="py-1 pr-3">Outer</th>
+                    <th className="py-1 pr-3">Inner</th>
+                    <th className="py-1 pr-3">Allocation Notes</th>
+                    <th className="py-1 pr-3">Category</th>
+                    <th className="py-1 pr-3">Reel/Serial</th>
+                    <th className="py-1 pr-3">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {extra.allocations.map((a) => (
+                    <tr key={a.id} className="border-t">
+                      <td className="py-1 pr-3">{a.type}</td>
+                      <td className="py-1 pr-3">{a.type === "reel" ? a.footage : a.qty}</td>
+                      <td className="py-1 pr-3">{a.type === "reel" ? a.outer : ""}</td>
+                      <td className="py-1 pr-3">{a.type === "reel" ? a.inner : ""}</td>
+                      <td className="py-1 pr-3">{a.allocationId}</td>
+                      <td className="py-1 pr-3">{a.allocationCategory || ""}</td>
+                      <td className="py-1 pr-3">{a.reelSerial || ""}</td>
+                      <td className="py-1 pr-3">
+                        <button disabled={locked} onClick={() => removeAllocation(wo, product.code, a.id)} className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border">
+                          <Trash2 className="w-4 h-4" /> Remove
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      )}
+
+      {tab === "accounting" && (
+        <div className="mt-4 bg-gray-50 rounded-xl p-3 border overflow-x-auto">
+          {extra.allocations.length === 0 ? (
+            <div className="text-sm text-gray-600">No allocations to assign assets.</div>
+          ) : (
+            <table className="min-w-full text-sm">
+              <thead>
+                <tr className="text-left text-gray-600">
+                  <th className="py-1 pr-3">Type</th>
+                  <th className="py-1 pr-3">Qty/Footage</th>
+                  <th className="py-1 pr-3">Outer</th>
+                  <th className="py-1 pr-3">Inner</th>
+                  <th className="py-1 pr-3">Allocation Notes</th>
+                  <th className="py-1 pr-3">Category</th>
+                  <th className="py-1 pr-3">Reel/Serial</th>
+                  <th className="py-1 pr-3">Asset ID</th>
+                </tr>
+              </thead>
+              <tbody>
+                {extra.allocations.map((a) => (
+                  <tr key={a.id} className="border-t">
+                    <td className="py-1 pr-3">{a.type}</td>
+                    <td className="py-1 pr-3">{a.type === "reel" ? a.footage : a.qty}</td>
+                    <td className="py-1 pr-3">{a.type === "reel" ? a.outer : ""}</td>
+                    <td className="py-1 pr-3">{a.type === "reel" ? a.inner : ""}</td>
+                    <td className="py-1 pr-3">{a.allocationId}</td>
+                    <td className="py-1 pr-3">{a.allocationCategory || ""}</td>
+                    <td className="py-1 pr-3">{a.reelSerial || ""}</td>
+                    <td className="py-1 pr-3">
+                      <input className="border rounded-lg p-1" placeholder="Asset ID"
+                        onChange={(e) => setAssetId(wo, product.code, a.id, e.target.value)} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
     </div>
   );
 }
