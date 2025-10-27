@@ -14,8 +14,12 @@ export function useAllocations(grouped) {
     const posted = base?.posted || 0;
     const returned = base?.returned || 0;
     const totalAvailable = Math.max(posted - returned, 0);
-    const allocatedSum = extra.allocations.reduce((s, a) => s + (a.type === "reel" ? a.footage : a.qty), 0);
-    const remaining = Math.max(totalAvailable - allocatedSum, 0);
+    const allocatedSum = extra.allocations.reduce((s, a) => {
+      const cat = (a.allocationCategory || "").toLowerCase();
+      const isCustom = cat === "custom" || cat === "__custom__";
+      if (isCustom) return s; // skip counting custom allocations
+      return s + (a.type === "reel" ? a.footage : a.qty);
+    }, 0);    const remaining = Math.max(totalAvailable - allocatedSum, 0);
     return { base, extra, totalAvailable, allocatedSum, remaining, overAllocated: allocatedSum > totalAvailable };
   };
 

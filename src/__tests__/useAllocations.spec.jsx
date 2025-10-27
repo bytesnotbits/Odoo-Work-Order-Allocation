@@ -83,3 +83,20 @@ test('lockWorkOrder succeeds when everything allocated & asseted', () => {
   const msg = window.alert.mock.calls[0][0]
   expect(msg).toMatch(/marked complete/i)
 })
+
+test('custom allocations do not count toward allocated sum', () => {
+  const grouped = makeGrouped();
+  const { result } = renderHook(() => useAllocations(grouped));
+
+  act(() => {
+    result.current.upsertAllocation('WO1','190',{
+      type:'regular',
+      qty:1,
+      allocationCategory:'Custom'
+    });
+  });
+
+  const s = result.current.getItemState('WO1','190');
+  expect(s.allocatedSum).toBe(0);
+  expect(s.remaining).toBe(2);
+});
