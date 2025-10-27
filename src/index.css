@@ -26,8 +26,7 @@ a:hover {
 
 body {
   margin: 0;
-  display: flex;
-  place-items: center;
+  /* allow the app to use full width; no global flex centering */
   min-width: 320px;
   min-height: 100vh;
 }
