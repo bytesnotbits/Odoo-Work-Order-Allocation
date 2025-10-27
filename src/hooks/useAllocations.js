@@ -138,7 +138,7 @@ export function useAllocations(grouped) {
       }
     }
 
-    // (3) asset IDs (accept string or object with assetId)
+    // (3) asset IDs (and SCXR-only COE field validation)
     for (const [code] of gm) {
       const k = keyOf(wo, code);
       const state = allocState[k] || { allocations: [], assets: {} };
@@ -146,6 +146,18 @@ export function useAllocations(grouped) {
         const v = state.assets[a.id];
         const assetId = typeof v === 'object' ? v.assetId : v;
         if (!assetId) issues.push(`Missing Asset ID on [${code}] for allocation ${a.id}.`);
+        if (isSCXR) {
+          const meta = typeof v === 'object'
+            ? v
+            : { assetId: v ?? "", coeLoc: "", rackBay: "", sepcat: "" };
+          const missing = [];
+          if (!meta.coeLoc)  missing.push("COE LOC");
+          if (!meta.rackBay) missing.push("RACK/BAY");
+          if (!meta.sepcat)  missing.push("SEPCAT");
+          if (missing.length) {
+            issues.push(`SCXR requires ${missing.join(", ")} on [${code}] allocation ${a.id}.`);
+          }
+        }
       }
     }
 

@@ -41,3 +41,12 @@ test('groupRows builds posted/returned by WO + product code', () => {
   expect(item.returned).toBe(3)
   expect(item.isCable).toBe(true)
 })
+
+test('normalizeRow + groupRows captures group column', () => {
+  const rows = [
+    normalizeRow({ 'WORK ORDER':'WO1', 'Order Lines':'[111] FIBER', 'Order Lines/Delivery Quantity': 1, group: 'SCXR' }),
+  ];
+  const g = groupRows(rows);
+  const item = g.get('WO1').get('111');
+  expect(item.group).toBe('SCXR');
+});

@@ -5,11 +5,12 @@ export function normalizeRow(r) {
     workOrder: String(r["WORK ORDER"] ?? r["Work Order"] ?? r["WorkOrder"] ?? "").trim(),
     orderRef: String(r["Order Reference"] ?? r["Order"] ?? r["SO"] ?? "").trim(),
     productLine: String(r["Order Lines"] ?? r["Product"] ?? r["Item"] ?? "").trim(),
-    deliveryQty: Number(r["Order Lines/Delivery Quantity"] ?? r["Delivered Qty"] ?? r["Quantity"] ?? 0) || 0,
+    deliveryQty: Number(r["Order Lines/Delivery Quantity"] ?? r["Delivered Qty"] ?? r["Quantity"] ?? 0) || 0, // ensure numeric
     cartQty: Number(r["Cart Quantity"] ?? r["Ordered Qty"] ?? 0) || 0,
-    status: String(r["Delivery Status"] ?? r["Status"] ?? "").trim(),
-    creationDate: r["Creation Date"] ?? r["Date"] ?? null,
+    status: String(r["Delivery Status"] ?? r["Status"] ?? "").trim(), // e.g. "Fully Delivered"
+    creationDate: r["Creation Date"] ?? r["Date"] ?? null, // keep as-is
     customer: String(r["Customer"] ?? "").trim(),
+    group: String(r["group"] ?? r["Group"] ?? r["GROUP"] ?? "").trim(), // optional grouping field
   };
 }
 
@@ -36,11 +37,12 @@ export function groupRows(rows) {
     const { code, desc } = parseProductFromLine(r.productLine);
     if (!m.has(r.workOrder)) m.set(r.workOrder, new Map());
     const gm = m.get(r.workOrder);
-    if (!gm.has(code)) gm.set(code, { code, desc, posted: 0, returned: 0, isCable: isCable(desc), group: "" });
+    if (!gm.has(code)) gm.set(code, { code, desc, posted: 0, returned: 0, isCable: isCable(desc), group: r.group || "" });
     const item = gm.get(code);
     if (isReturnRow(r)) item.returned += Math.abs(r.deliveryQty);
     else item.posted += r.deliveryQty;
-    if (r.group && !item.group) item.group = r.group; // first non-empty wins
+    // prefer the first non-empty group we see for this item
+    if (!item.group && r.group) item.group = r.group;
   }
   return m;
 }
