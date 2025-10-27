@@ -81,9 +81,9 @@ export default function ProductCard({
       <div className="flex-1">
         <div className="font-semibold text-base md:text-lg">[{product.code}] {product.desc || "Unnamed"}</div>
         <div className="text-sm text-gray-600 flex flex-wrap gap-3 mt-1">
-          <span>Posted: <b>{product.posted}</b></span>
+          <span>Total: <b>{product.posted}</b></span>
           <span>Returned: <b>{product.returned}</b></span>
-          <span>Total available: <b>{totalAvailable}</b></span>
+          <span>To Allocate: <b>{totalAvailable}</b></span>
           <span>Allocated: <b>{allocatedSum}</b></span>
           <span className={remaining === 0 ? "text-green-600" : "text-amber-600"}>Unallocated: <b>{remaining}</b></span>
           {product.isCable && <Badge>Reel/Cable</Badge>}
@@ -93,7 +93,7 @@ export default function ProductCard({
 
       {tab === "engineering" && (
         <div className="mt-4 grid md:grid-cols-2 gap-4">
-          {/* Add allocation */}
+          {/* LEFT: Add allocation (unchanged) */}
           <div className="bg-gray-50 rounded-xl p-3 border">
             <div className="font-medium mb-2">Add allocation</div>
 
@@ -125,7 +125,8 @@ export default function ProductCard({
                 >
                   <Plus className="w-4 h-4" aria-hidden="true" />
                   <span className="font-medium">Add Span</span>
-                </button>              </div>
+                </button>
+              </div>
             )}
 
             {product.isCable && (
@@ -201,45 +202,53 @@ export default function ProductCard({
             )}
           </div>
 
-          {/* Allocations table */}
-          <div className="bg-gray-50 rounded-xl p-3 border overflow-x-auto">
+          {/* RIGHT: Allocations table with responsive scroll */}
+          <div className="bg-gray-50 rounded-xl p-3 border">
             <div className="font-medium mb-2">Allocations</div>
-            {extra.allocations.length === 0 ? (
-              <div className="text-sm text-gray-600">No allocations yet.</div>
-            ) : (
-              <table className="min-w-full text-sm">
-                <thead>
-                  <tr className="text-left text-gray-600">
-                    <th className="py-1 pr-3">Type</th>
-                    <th className="py-1 pr-3">Qty/Footage</th>
-                    <th className="py-1 pr-3">Outer</th>
-                    <th className="py-1 pr-3">Inner</th>
-                    <th className="py-1 pr-3">Allocation Notes</th>
-                    <th className="py-1 pr-3">Category</th>
-                    <th className="py-1 pr-3">Reel/Serial</th>
-                    <th className="py-1 pr-3">Actions</th>
+            <div data-testid="allocations-scroll" className="-mx-2 sm:mx-0 overflow-x-auto">
+              <table className="min-w-[960px] sm:min-w-full table-fixed text-sm">
+                <thead className="sticky top-0 bg-white">
+                  <tr className="[&>th]:px-2 [&>th]:py-1 [&>th]:text-left [&>th]:font-medium [&>th]:whitespace-nowrap text-gray-600">
+                    <th className="w-16">Type</th>
+                    <th className="w-24">Qty/Footage</th>
+                    <th className="w-20">Outer</th>
+                    <th className="w-20">Inner</th>
+                    <th className="min-w-[160px]">Allocation Notes</th>
+                    <th className="min-w-[140px]">Category</th>
+                    <th className="min-w-[140px]">Reel/Serial</th>
+                    <th className="w-14 text-right">Action</th>
                   </tr>
                 </thead>
-                <tbody>
-                  {extra.allocations.map((a) => (
-                    <tr key={a.id} className="border-t">
-                      <td className="py-1 pr-3">{a.type}</td>
-                      <td className="py-1 pr-3">{a.type === "reel" ? a.footage : a.qty}</td>
-                      <td className="py-1 pr-3">{a.type === "reel" ? a.outer : ""}</td>
-                      <td className="py-1 pr-3">{a.type === "reel" ? a.inner : ""}</td>
-                      <td className="py-1 pr-3">{a.allocationId}</td>
-                      <td className="py-1 pr-3">{a.allocationCategory || ""}</td>
-                      <td className="py-1 pr-3">{a.reelSerial || ""}</td>
-                      <td className="py-1 pr-3">
-                        <button disabled={locked} onClick={() => removeAllocation(wo, product.code, a.id)} className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border">
-                          <Trash2 className="w-4 h-4" /> Remove
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                <tbody className="[&>tr>td]:px-2 [&>tr>td]:py-1">
+                  {extra.allocations.length === 0 ? (
+                    <tr><td colSpan={8} className="text-sm text-gray-600 py-3">No allocations yet.</td></tr>
+                  ) : (
+                    extra.allocations.map(a => (
+                      <tr key={a.id} className="border-t">
+                        <td className="whitespace-nowrap">{a.type}</td>
+                        <td className="whitespace-nowrap">{a.type === 'reel' ? a.footage : a.qty}</td>
+                        <td className="whitespace-nowrap">{a.type === 'reel' ? a.outer : ''}</td>
+                        <td className="whitespace-nowrap">{a.type === 'reel' ? a.inner : ''}</td>
+                        <td title={a.allocationId || ''} className="truncate max-w-[240px]">{a.allocationId || ''}</td>
+                        <td className="whitespace-nowrap">{a.allocationCategory || ''}</td>
+                        <td className="whitespace-nowrap">{a.reelSerial || ''}</td>
+                        <td className="text-right">
+                          <button
+                            type="button"
+                            className="inline-flex px-2 py-1 rounded border"
+                            onClick={() => removeAllocation(wo, product.code, a.id)}
+                            aria-label="Remove allocation"
+                            disabled={locked}
+                          >
+                            ✕
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
-            )}
+            </div>
           </div>
         </div>
       )}
