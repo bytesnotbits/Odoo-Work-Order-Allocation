@@ -15,12 +15,12 @@ export function useAllocations(grouped) {
     const returned = base?.returned || 0;
     const totalAvailable = Math.max(posted - returned, 0);
     const allocatedSum = extra.allocations.reduce((s, a) => {
-      const cat = (a.allocationCategory || "").toLowerCase();
-      const isCustom = cat === "custom" || cat === "__custom__";
-      if (isCustom) return s; // skip counting custom allocations
+      // New rule: if it came from the "Custom…" path, don't count it.
+      if (a.allocationCategoryIsCustom) return s;
       return s + (a.type === "reel" ? a.footage : a.qty);
-    }, 0);    const remaining = Math.max(totalAvailable - allocatedSum, 0);
-    return { base, extra, totalAvailable, allocatedSum, remaining, overAllocated: allocatedSum > totalAvailable };
+    }, 0);
+    const remaining = Math.max(totalAvailable - allocatedSum, 0);
+      return { base, extra, totalAvailable, allocatedSum, remaining, overAllocated: allocatedSum > totalAvailable };
   };
 
   const upsertAllocation = (wo, code, alloc) => {

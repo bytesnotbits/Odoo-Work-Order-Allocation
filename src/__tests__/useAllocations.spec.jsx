@@ -28,6 +28,25 @@ test('allocation sums and remaining', () => {
     result.current.upsertAllocation('WO1','190',{ type:'regular', qty:1, allocationId:'A1' })
   })
 
+  +test('typed custom categories do not count toward allocated', () => {
+  const grouped = makeGrouped()
+  const { result } = renderHook(() => useAllocations(grouped))
+
+  act(() => {
+    // User chose Custom… and typed "SCRAP"
+    result.current.upsertAllocation('WO1','190',{
+      type:'regular',
+      qty:2,
+      allocationCategory:'SCRAP',
+      allocationCategoryIsCustom:true
+    })
+  })
+
+  const s = result.current.getItemState('WO1','190')
+  expect(s.allocatedSum).toBe(0)
+  expect(s.remaining).toBe(2) // posted 2 on 190 in this fixture
+  })
+
   const s = result.current.getItemState('WO1','190')
   expect(s.totalAvailable).toBe(2)
   expect(s.allocatedSum).toBe(1)

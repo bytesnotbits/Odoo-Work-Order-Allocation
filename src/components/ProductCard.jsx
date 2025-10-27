@@ -28,14 +28,22 @@ export default function ProductCard({
   const spanMin = spanStartNum !== null && spanEndNum !== null ? Math.min(spanStartNum, spanEndNum) : null;
   const spanMax = spanStartNum !== null && spanEndNum !== null ? Math.max(spanStartNum, spanEndNum) : null;
 
-  const finalCategory = () => (allocCategory === "__custom__" ? (allocCategoryCustom || "Custom") : allocCategory);
+  const finalCategory = () =>
+    allocCategory === "__custom__" ? (allocCategoryCustom || "Custom") : allocCategory;
+  const isCustomCategory = () => allocCategory === "__custom__";
 
   function addRegular() {
     const qty = Number(allocQty);
     if (!qty || qty <= 0) return alert("Enter a positive quantity");
     if (qty > remaining) return alert("Quantity exceeds remaining available");
-    upsertAllocation(wo, product.code, { type: "regular", qty, allocationId: allocId || "", allocationCategory: finalCategory(), reelSerial });
-    setAllocQty(""); setAllocId(""); setReelSerial(""); setAllocCategory(ALLOCATION_OPTIONS[0]); setAllocCategoryCustom("");
+    upsertAllocation(wo, product.code, {
+      type: "regular",
+      qty,
+      allocationId: allocId || "",
+      allocationCategory: finalCategory(),
+      allocationCategoryIsCustom: isCustomCategory(),
+      reelSerial
+    });    setAllocQty(""); setAllocId(""); setReelSerial(""); setAllocCategory(ALLOCATION_OPTIONS[0]); setAllocCategoryCustom("");
   }
 
   function addReelPiece() {
@@ -57,10 +65,15 @@ export default function ProductCard({
       }
     }
     upsertAllocation(wo, product.code, {
-      type: "reel", outer: Number(outer), inner: Number(inner), footage: reelFootage,
-      allocationId: allocId || "", allocationCategory: finalCategory(), reelSerial
-    });
-    setOuter(""); setInner(""); setAllocId(""); setReelSerial(""); setAllocCategory(ALLOCATION_OPTIONS[0]); setAllocCategoryCustom("");
+      type: "reel",
+      outer: Number(outer),
+      inner: Number(inner),
+      footage: reelFootage,
+      allocationId: allocId || "",
+      allocationCategory: finalCategory(),
+      allocationCategoryIsCustom: isCustomCategory(),
+      reelSerial
+    });    setOuter(""); setInner(""); setAllocId(""); setReelSerial(""); setAllocCategory(ALLOCATION_OPTIONS[0]); setAllocCategoryCustom("");
   }
 
   return (
