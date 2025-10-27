@@ -2,7 +2,7 @@ import { useState } from "react";
 import { uid } from "../lib/uid";
 
 export function useAllocations(grouped) {
-  // { "WO|CODE": { allocations: [], assets: {}, reels: {}, locked: bool } }
+  // { "WO|CODE": { allocations: [], assets: { [allocId]: string | {assetId, coeLoc, rackBay, sepcat} }, reels: {}, locked: bool } }
   const [allocState, setAllocState] = useState({});
 
   const keyOf = (wo, code) => `${wo}|${code}`;
@@ -10,7 +10,7 @@ export function useAllocations(grouped) {
   const getItemState = (wo, code) => {
     const base = grouped.get(wo)?.get(code);
     const k = keyOf(wo, code);
-    const extra = allocState[k] || { allocations: [], assets: {}, locked: false };
+    const extra = allocState[k] || { allocations: [], assets: {}, reels: {}, coe: {}, locked: false };
     const posted = base?.posted || 0;
     const returned = base?.returned || 0;
     const totalAvailable = Math.max(posted - returned, 0);
@@ -26,7 +26,7 @@ export function useAllocations(grouped) {
   const upsertAllocation = (wo, code, alloc) => {
     setAllocState(prev => {
       const k = keyOf(wo, code);
-      const cur = prev[k] || { allocations: [], assets: {}, locked: false, reels: {} };
+      const cur = prev[k] || { allocations: [], assets: {}, locked: false, reels: {}, coe: {} };
       return { ...prev, [k]: { ...cur, allocations: [...cur.allocations, { id: uid(), ...alloc }] } };
     });
   };
@@ -34,16 +34,35 @@ export function useAllocations(grouped) {
   const removeAllocation = (wo, code, id) => {
     setAllocState(prev => {
       const k = keyOf(wo, code);
-      const cur = prev[k] || { allocations: [], assets: {}, locked: false, reels: {} };
-      return { ...prev, [k]: { ...cur, allocations: cur.allocations.filter(a => a.id !== id) } };
+      const cur = prev[k] || { allocations: [], assets: {}, locked: false, reels: {}, coe: {} };
+      const { [id]: _, ...restCoe } = cur.coe || {};
+      return { ...prev, [k]: { ...cur, allocations: cur.allocations.filter(a => a.id !== id), coe: restCoe } };
     });
   };
 
+  // Back-compat helper: keep setAssetId but store as object
   const setAssetId = (wo, code, allocId, assetId) => {
     setAllocState(prev => {
       const k = keyOf(wo, code);
       const cur = prev[k] || { allocations: [], assets: {}, locked: false, reels: {} };
-      return { ...prev, [k]: { ...cur, assets: { ...cur.assets, [allocId]: assetId } } };
+      const prevMeta = cur.assets?.[allocId];
+      const meta = typeof prevMeta === 'object'
+        ? { ...prevMeta, assetId }
+        : { assetId, coeLoc: '', rackBay: '', sepcat: '' };
+      return { ...prev, [k]: { ...cur, assets: { ...cur.assets, [allocId]: meta } } };
+    });
+  };
+
+  // New: set any subset of asset meta fields
+  const setAssetMeta = (wo, code, allocId, fields) => {
+    setAllocState(prev => {
+      const k = keyOf(wo, code);
+      const cur = prev[k] || { allocations: [], assets: {}, locked: false, reels: {} };
+      const prevMeta = cur.assets?.[allocId];
+      const base = typeof prevMeta === 'object'
+        ? prevMeta
+        : { assetId: (prevMeta ?? ''), coeLoc: '', rackBay: '', sepcat: '' };
+      return { ...prev, [k]: { ...cur, assets: { ...cur.assets, [allocId]: { ...base, ...fields } } } };
     });
   };
 
@@ -119,12 +138,14 @@ export function useAllocations(grouped) {
       }
     }
 
-    // (3) asset IDs
+    // (3) asset IDs (accept string or object with assetId)
     for (const [code] of gm) {
       const k = keyOf(wo, code);
       const state = allocState[k] || { allocations: [], assets: {} };
       for (const a of state.allocations) {
-        if (!state.assets[a.id]) issues.push(`Missing Asset ID on [${code}] for allocation ${a.id}.`);
+        const v = state.assets[a.id];
+        const assetId = typeof v === 'object' ? v.assetId : v;
+        if (!assetId) issues.push(`Missing Asset ID on [${code}] for allocation ${a.id}.`);
       }
     }
 

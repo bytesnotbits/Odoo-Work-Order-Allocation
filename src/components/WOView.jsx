@@ -4,7 +4,7 @@ import ProductCard from "./ProductCard";
 
 export default function WOView({
   wo, grouped, getItemState, upsertAllocation, removeAllocation, setAssetId,
-  setReelSpan, getReelSpan, listReels, lockWorkOrder, tab, allocState
+  setAssetMeta, setReelSpan, getReelSpan, listReels, lockWorkOrder, tab, allocState
 }) {
   const gm = grouped.get(wo) || new Map();
   const products = Array.from(gm.values());
@@ -33,6 +33,7 @@ export default function WOView({
           upsertAllocation={upsertAllocation}
           removeAllocation={removeAllocation}
           setAssetId={setAssetId}
+          setAssetMeta={setAssetMeta}
           setReelSpan={setReelSpan}
           getReelSpan={getReelSpan}
           listReels={listReels}

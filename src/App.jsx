@@ -22,7 +22,7 @@ export default function App() {
 
   const {
     allocState, keyOf, getItemState, upsertAllocation, removeAllocation,
-    setAssetId, setReelSpan, getReelSpan, listReels, lockWorkOrder
+    setAssetId, setAssetMeta, setReelSpan, getReelSpan, listReels, lockWorkOrder
   } = useAllocations(grouped);
 
   const workOrders = useMemo(() => Array.from(grouped.keys()).sort(), [grouped]);
@@ -144,6 +144,7 @@ export default function App() {
                 upsertAllocation={upsertAllocation}
                 removeAllocation={removeAllocation}
                 setAssetId={setAssetId}
+                setAssetMeta={setAssetMeta}
                 setReelSpan={setReelSpan}
                 getReelSpan={getReelSpan}
                 listReels={listReels}

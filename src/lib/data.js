@@ -1,5 +1,7 @@
 // Constants + demo data
 export const ALLOCATION_OPTIONS = ["Aerial", "Buried", "Underground", "Removal"];
+// COE SepCat choices (placeholder — tweak to your list)
+export const SEPCAT_OPTIONS = ["PROVISION", "SCRAP", "REDEPLOY", "UNKNOWN"];
 
 export const demoRows = [
   { "Creation Date": "2025-10-17 09:58:20", "Customer": "Chris Lindemann Jr", "Delivery Status": "Fully Delivered", "Order Reference": "W001629", "Order Lines": "W001629 - [1396R] FO 288R RIBBON FIBER", "WORK ORDER": "11880", "Cart Quantity": 3896, "Order Lines/Delivery Quantity": 990 },

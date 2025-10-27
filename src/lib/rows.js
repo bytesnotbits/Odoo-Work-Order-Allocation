@@ -29,17 +29,18 @@ export function isCable(desc) {
 }
 
 export function groupRows(rows) {
-  // Map<workOrder, Map<code, {code, desc, posted, returned, isCable}>>
+  // Map<workOrder, Map<code, {code, desc, posted, returned, isCable, group}>>
   const m = new Map();
   for (const r of rows) {
     if (!r.workOrder) continue;
     const { code, desc } = parseProductFromLine(r.productLine);
     if (!m.has(r.workOrder)) m.set(r.workOrder, new Map());
     const gm = m.get(r.workOrder);
-    if (!gm.has(code)) gm.set(code, { code, desc, posted: 0, returned: 0, isCable: isCable(desc) });
+    if (!gm.has(code)) gm.set(code, { code, desc, posted: 0, returned: 0, isCable: isCable(desc), group: "" });
     const item = gm.get(code);
     if (isReturnRow(r)) item.returned += Math.abs(r.deliveryQty);
     else item.posted += r.deliveryQty;
+    if (r.group && !item.group) item.group = r.group; // first non-empty wins
   }
   return m;
 }

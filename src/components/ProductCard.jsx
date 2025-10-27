@@ -5,7 +5,7 @@ import { Plus, Trash2, Ruler } from "lucide-react";
 
 export default function ProductCard({
   wo, product, getItemState,
-  upsertAllocation, removeAllocation, setAssetId,
+  upsertAllocation, removeAllocation, setAssetId, setAssetMeta,
   setReelSpan, getReelSpan, listReels, tab, locked
 }) {
   const { base, extra, totalAvailable, allocatedSum, remaining } = getItemState(wo, product.code);
@@ -202,9 +202,9 @@ export default function ProductCard({
             )}
           </div>
 
-          {/* RIGHT: Allocations table with responsive scroll */}
-          <div className="bg-gray-50 rounded-xl p-3 border">
-            <div className="font-medium mb-2">Allocations</div>
+          {/* RIGHT: Allocations table (engineering can also capture asset meta) */}
+          <div className="bg-gray-50 rounded-xl p-3 border overflow-x-auto">
+              <div className="font-medium mb-2">Allocations</div>
             <div data-testid="allocations-scroll" className="-mx-2 sm:mx-0 overflow-x-auto">
               <table className="min-w-[960px] sm:min-w-full table-fixed text-sm">
                 <thead className="sticky top-0 bg-white">
@@ -216,22 +216,62 @@ export default function ProductCard({
                     <th className="min-w-[160px]">Allocation Notes</th>
                     <th className="min-w-[140px]">Category</th>
                     <th className="min-w-[140px]">Reel/Serial</th>
+                    <th className="min-w-[140px]">Asset ID</th>
+                    <th className="min-w-[120px]">COE LOC</th>
+                    <th className="min-w-[120px]">RACK/BAY</th>
+                    <th className="min-w-[100px]">SEPCAT</th>
                     <th className="w-14 text-right">Action</th>
                   </tr>
                 </thead>
                 <tbody className="[&>tr>td]:px-2 [&>tr>td]:py-1">
                   {extra.allocations.length === 0 ? (
-                    <tr><td colSpan={8} className="text-sm text-gray-600 py-3">No allocations yet.</td></tr>
+                    <tr><td colSpan={12} className="text-sm text-gray-600 py-3">No allocations yet.</td></tr>
                   ) : (
-                    extra.allocations.map(a => (
-                      <tr key={a.id} className="border-t">
-                        <td className="whitespace-nowrap">{a.type}</td>
+                    extra.allocations.map(a => {
+                      const raw = (extra.assets && extra.assets[a.id]) || {};
+                      const m = typeof raw === 'object'
+                        ? raw
+                        : { assetId: raw ?? '', coeLoc: '', rackBay: '', sepcat: '' };
+                      return (
+                      <tr key={a.id} className="border-t">                        <td className="whitespace-nowrap">{a.type}</td>
                         <td className="whitespace-nowrap">{a.type === 'reel' ? a.footage : a.qty}</td>
                         <td className="whitespace-nowrap">{a.type === 'reel' ? a.outer : ''}</td>
                         <td className="whitespace-nowrap">{a.type === 'reel' ? a.inner : ''}</td>
                         <td title={a.allocationId || ''} className="truncate max-w-[240px]">{a.allocationId || ''}</td>
                         <td className="whitespace-nowrap">{a.allocationCategory || ''}</td>
                         <td className="whitespace-nowrap">{a.reelSerial || ''}</td>
+                        <td className="py-1">
+                          <input
+                            className="border rounded-lg p-1 w-40"
+                            placeholder="Asset ID"
+                            value={m.assetId || ''}
+                            onChange={(e) => setAssetMeta(wo, product.code, a.id, { assetId: e.target.value })}
+                          />
+                        </td>
+                        <td className="py-1">
+                          <input
+                            className="border rounded-lg p-1 w-32"
+                            placeholder="COE LOC"
+                            value={m.coeLoc || ''}
+                            onChange={(e) => setAssetMeta(wo, product.code, a.id, { coeLoc: e.target.value })}
+                          />
+                        </td>
+                        <td className="py-1">
+                          <input
+                            className="border rounded-lg p-1 w-32"
+                            placeholder="RACK/BAY"
+                            value={m.rackBay || ''}
+                            onChange={(e) => setAssetMeta(wo, product.code, a.id, { rackBay: e.target.value })}
+                          />
+                        </td>
+                        <td className="py-1">
+                          <input
+                            className="border rounded-lg p-1 w-28"
+                            placeholder="SEPCAT"
+                            value={m.sepcat || ''}
+                            onChange={(e) => setAssetMeta(wo, product.code, a.id, { sepcat: e.target.value })}
+                          />
+                        </td>
                         <td className="text-right">
                           <button
                             type="button"
@@ -244,7 +284,7 @@ export default function ProductCard({
                           </button>
                         </td>
                       </tr>
-                    ))
+                    )})
                   )}
                 </tbody>
               </table>
@@ -258,7 +298,7 @@ export default function ProductCard({
           {extra.allocations.length === 0 ? (
             <div className="text-sm text-gray-600">No allocations to assign assets.</div>
           ) : (
-            <table className="min-w-full text-sm">
+            <table className="min-w-[960px] sm:min-w-full text-sm">
               <thead>
                 <tr className="text-left text-gray-600">
                   <th className="py-1 pr-3">Type</th>
@@ -269,11 +309,16 @@ export default function ProductCard({
                   <th className="py-1 pr-3">Category</th>
                   <th className="py-1 pr-3">Reel/Serial</th>
                   <th className="py-1 pr-3">Asset ID</th>
+                  <th className="py-1 pr-3">COE LOC</th>
+                  <th className="py-1 pr-3">RACK/BAY</th>
+                  <th className="py-1 pr-3">SEPCAT</th>
                 </tr>
               </thead>
               <tbody>
-                {extra.allocations.map((a) => (
-                  <tr key={a.id} className="border-t">
+                {extra.allocations.map((a) => {
+                  const meta = (extra.assets && extra.assets[a.id]) || {};
+                  const assetMeta = typeof meta === 'object' ? meta : { assetId: meta ?? '', coeLoc: '', rackBay: '', sepcat: '' };
+                  return (<tr key={a.id} className="border-t">
                     <td className="py-1 pr-3">{a.type}</td>
                     <td className="py-1 pr-3">{a.type === "reel" ? a.footage : a.qty}</td>
                     <td className="py-1 pr-3">{a.type === "reel" ? a.outer : ""}</td>
@@ -282,16 +327,31 @@ export default function ProductCard({
                     <td className="py-1 pr-3">{a.allocationCategory || ""}</td>
                     <td className="py-1 pr-3">{a.reelSerial || ""}</td>
                     <td className="py-1 pr-3">
-                      <input className="border rounded-lg p-1" placeholder="Asset ID"
-                        onChange={(e) => setAssetId(wo, product.code, a.id, e.target.value)} />
+                      <input className="border rounded-lg p-1 w-40" placeholder="Asset ID"
+                        value={assetMeta.assetId || ''}
+                        onChange={(e) => setAssetMeta(wo, product.code, a.id, { assetId: e.target.value })} />
                     </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      )}
+                    <td className="py-1 pr-3">
+                      <input className="border rounded-lg p-1 w-32" placeholder="COE LOC"
+                        value={assetMeta.coeLoc || ''}
+                        onChange={(e) => setAssetMeta(wo, product.code, a.id, { coeLoc: e.target.value })} />
+                    </td>
+                    <td className="py-1 pr-3">
+                      <input className="border rounded-lg p-1 w-32" placeholder="RACK/BAY"
+                        value={assetMeta.rackBay || ''}
+                        onChange={(e) => setAssetMeta(wo, product.code, a.id, { rackBay: e.target.value })} />
+                    </td>
+                    <td className="py-1 pr-3">
+                      <input className="border rounded-lg p-1 w-28" placeholder="SEPCAT"
+                        value={assetMeta.sepcat || ''}
+                        onChange={(e) => setAssetMeta(wo, product.code, a.id, { sepcat: e.target.value })} />
+                     </td>
+                  </tr>)})}
+               </tbody>
+             </table>
+           )}
+         </div>
+       )}
     </div>
   );
 }
