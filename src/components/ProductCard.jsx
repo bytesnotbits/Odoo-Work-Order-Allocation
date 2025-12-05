@@ -8,6 +8,10 @@ export default function ProductCard({
   upsertAllocation, removeAllocation, setAssetId, setAssetMeta,
   setReelSpan, getReelSpan, listReels, tab, locked
 }) {
+  // Avoid throwing in test environment where window.alert is "not implemented"
+  const safeAlert = (msg) => {
+    try { if (typeof window !== 'undefined' && typeof window.alert === 'function') window.alert(msg) } catch { /* no-op in tests */ }
+  };
   const { base, extra, totalAvailable, allocatedSum, remaining } = getItemState(wo, product.code);
   const [allocQty, setAllocQty] = useState("");
   const [allocId, setAllocId] = useState("");
@@ -34,8 +38,8 @@ export default function ProductCard({
 
   function addRegular() {
     const qty = Number(allocQty);
-    if (!qty || qty <= 0) return alert("Enter a positive quantity");
-    if (qty > remaining) return alert("Quantity exceeds remaining available");
+    if (!qty || qty <= 0) return safeAlert("Enter a positive quantity");
+    if (qty > remaining) return safeAlert("Quantity exceeds remaining available");
     upsertAllocation(wo, product.code, {
       type: "regular",
       qty,
@@ -47,21 +51,21 @@ export default function ProductCard({
   }
 
   function addReelPiece() {
-    if (!reelSerial) return alert("Enter a Reel/Serial Number for this piece");
-    if (reelFootage <= 0) return alert("Enter valid outer/inner to compute footage");
-    if (reelFootage > remaining) return alert("Footage exceeds remaining available");
+    if (!reelSerial) return safeAlert("Enter a Reel/Serial Number for this piece");
+    if (reelFootage <= 0) return safeAlert("Enter valid outer/inner to compute footage");
+    if (reelFootage > remaining) return safeAlert("Footage exceeds remaining available");
 
     const s = Math.min(Number(outer), Number(inner));
     const e = Math.max(Number(outer), Number(inner));
     const hasSpan = (spanMin !== null && spanMax !== null);
-    if (hasSpan) {
-      if (s < spanMin || e > spanMax) return alert("Piece is outside the defined span range");
+      if (hasSpan) {
+      if (s < spanMin || e > spanMax) return safeAlert("Piece is outside the defined span range");
       for (const a of extra.allocations) {
         if (a.type !== "reel" || a.outer == null || a.inner == null) continue;
         if ((a.reelSerial || "") !== reelSerial) continue;
         const es = Math.min(a.outer, a.inner);
         const ee = Math.max(a.outer, a.inner);
-        if (Math.min(e, ee) > Math.max(s, es)) return alert(`Overlap with existing piece [${es}–${ee}]`);
+        if (Math.min(e, ee) > Math.max(s, es)) return safeAlert(`Overlap with existing piece [${es}–${ee}]`);
       }
     }
     upsertAllocation(wo, product.code, {
@@ -153,9 +157,9 @@ export default function ProductCard({
                   </div>
                   <div className="mt-2">
                     <button disabled={locked} onClick={()=>{
-                      if (!reelSerial) return alert("Enter reel/serial to save a span");
+                    if (!reelSerial) return safeAlert("Enter reel/serial to save a span");
                       const s = Number(spanStartInput); const e = Number(spanEndInput);
-                      if (!isFinite(s) || !isFinite(e)) return alert("Enter numeric span start/end");
+                    if (!isFinite(s) || !isFinite(e)) return safeAlert("Enter numeric span start/end");
                       setReelSpan(wo, product.code, reelSerial, s, e);
                     }} className="px-3 py-1 rounded-lg border">Save span</button>
                   </div>

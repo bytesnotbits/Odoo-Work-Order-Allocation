@@ -59,7 +59,7 @@ export function useAllocations(grouped) {
       const k = keyOf(wo, code);
       const cur = prev[k] || { allocations: [], assets: {}, locked: false, reels: {} };
       const prevMeta = cur.assets?.[allocId];
-      const base = typeof prevMeta === 'object'
+      const base = (typeof prevMeta === 'object')
         ? prevMeta
         : { assetId: (prevMeta ?? ''), coeLoc: '', rackBay: '', sepcat: '' };
       return { ...prev, [k]: { ...cur, assets: { ...cur.assets, [allocId]: { ...base, ...fields } } } };
@@ -142,6 +142,9 @@ export function useAllocations(grouped) {
     for (const [code] of gm) {
       const k = keyOf(wo, code);
       const state = allocState[k] || { allocations: [], assets: {} };
+      // determine SCXR from grouped data
+      const base = grouped.get(wo)?.get(code);
+      const isSCXR = (base?.group || '') === 'SCXR';
       for (const a of state.allocations) {
         const v = state.assets[a.id];
         const assetId = typeof v === 'object' ? v.assetId : v;

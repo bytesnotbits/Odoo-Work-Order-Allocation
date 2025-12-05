@@ -20,10 +20,6 @@ export function exportAllocationsToXLSX({ workOrders, grouped, getItemState, key
           ReelSerialNumber: a.reelSerial || "",
           OuterSeq: a.type === "reel" ? a.outer : "",
           InnerSeq: a.type === "reel" ? a.inner : "",
-          AssetId: meta.assetId || "",
-          COE_LOC: meta.coeLoc || "",
-          RACK_BAY: meta.rackBay || "",
-          SEPCAT: meta.sepcat || "",
           // assets map can store a string or an object with meta
           ...(() => {
             const v = (allocState[k]?.assets || {})[a.id];
