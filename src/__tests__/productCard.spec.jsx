@@ -38,16 +38,16 @@ function renderProductCard(overrides = {}) {
   return render(<ProductCard {...defaultProps} {...overrides} />);
 }
 
-describe('ProductCard – Add Span button', () => {
-  test('is rendered with accessible name "Add Span"', async () => {
+describe('ProductCard – Add Asset button', () => {
+  test('is rendered with accessible name "Add Asset"', async () => {
     renderProductCard();
-    const btn = await screen.findByRole('button', { name: /add span/i });
+    const btn = await screen.findByRole('button', { name: /add asset/i });
     expect(btn).toBeInTheDocument();
   });
 
   test('button has button styling classes applied', async () => {
     renderProductCard();
-    const btn = await screen.findByRole('button', { name: /add span/i });
+    const btn = await screen.findByRole('button', { name: /add asset/i });
     expect(btn).toHaveClass('border');
   });
 
@@ -55,7 +55,7 @@ describe('ProductCard – Add Span button', () => {
     const user = userEvent.setup();
     const upsertAllocation = vi.fn();
     renderProductCard({ upsertAllocation });
-    const btn = await screen.findByRole('button', { name: /add span/i });
+    const btn = await screen.findByRole('button', { name: /add asset/i });
     // Click should not throw; component will guard invalid form values itself.
     await user.click(btn);
     // We can’t assert exact call without valid qty; we only assert that the DOM is still alive:

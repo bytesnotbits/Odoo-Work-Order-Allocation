@@ -152,10 +152,10 @@ export default function ProductCard({
                   type="button"
                   onClick={addRegular}
                   className={primaryButton}
-                  aria-label="Add Span"
+                  aria-label="Add Asset"
                 >
                   <Plus className="w-4 h-4" aria-hidden="true" />
-                  <span className="font-medium">Add Span</span>
+                  <span className="font-medium">Add Asset</span>
                 </button>
               </div>
             )}
