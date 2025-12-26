@@ -11,6 +11,7 @@ import { normalizeRow, groupRows } from "./lib/rows";
 import { exportAllocationsToXLSX } from "./lib/xlsxExport";
 import { useAllocations } from "./hooks/useAllocations";
 import { readFirstSheet } from "./utils/xlsxIO";
+import { naturalCompare } from "./lib/natural";
 
 export default function App() {
   const [rawRows, setRawRows] = useState(demoRows);
@@ -25,7 +26,7 @@ export default function App() {
     setAssetId, setAssetMeta, setReelSpan, getReelSpan, listReels, lockWorkOrder
   } = useAllocations(grouped);
 
-  const workOrders = useMemo(() => Array.from(grouped.keys()).sort(), [grouped]);
+  const workOrders = useMemo(() => Array.from(grouped.keys()).sort(naturalCompare), [grouped]);
   const activeWO = selectedWO || workOrders[0] || "";
   
 

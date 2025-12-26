@@ -81,3 +81,24 @@ test('rows without item code get unique per-line code to avoid lumping', () => {
   const g = groupRows(rows);
   expect(g.get('WO1').size).toBe(2);
 });
+
+test('Quantity Charged is preferred per row and parses commas/parentheses', () => {
+  const rows = [
+    normalizeRow({ 'WORK ORDER':'WO1', 'Item':'A', 'Item Description':'Item A', 'Quantity Charged':'1,234.5' }),
+    normalizeRow({ 'WORK ORDER':'WO1', 'Item':'A', 'Item Description':'Item A', 'Quantity':'2' }), // falls back to Quantity (no Quantity Charged)
+    normalizeRow({ 'WORK ORDER':'WO1', 'Item':'B', 'Item Description':'Item B', 'Quantity Charged':'(200)' }),
+  ];
+  const g = groupRows(rows);
+  expect(g.get('WO1').get('A').posted).toBeCloseTo(1236.5);
+  expect(g.get('WO1').get('B').returned).toBe(200);
+});
+
+test('zero-quantity lines are skipped', () => {
+  const rows = [
+    normalizeRow({ 'WORK ORDER':'WO1', 'Item':'A', 'Item Description':'Item A', 'Quantity Charged': 0 }),
+    normalizeRow({ 'WORK ORDER':'WO1', 'Item':'B', 'Item Description':'Item B', 'Quantity Charged': 5 }),
+  ];
+  const g = groupRows(rows);
+  expect(g.get('WO1').has('A')).toBe(false);
+  expect(g.get('WO1').get('B').posted).toBe(5);
+});

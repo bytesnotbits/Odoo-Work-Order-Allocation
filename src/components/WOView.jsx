@@ -1,13 +1,14 @@
 import Badge from "./Badge";
 import { AlertTriangle, CheckCircle2 } from "lucide-react";
 import ProductCard from "./ProductCard";
+import { naturalCompare } from "../lib/natural";
 
 export default function WOView({
   wo, grouped, getItemState, upsertAllocation, removeAllocation, setAssetId,
   setAssetMeta, setReelSpan, getReelSpan, listReels, lockWorkOrder, tab, allocState
 }) {
   const gm = grouped.get(wo) || new Map();
-  const products = Array.from(gm.values());
+  const products = Array.from(gm.values()).sort((a, b) => naturalCompare(a.code, b.code));
 
   const allAllocated = products.every((p) => getItemState(wo, p.code).remaining === 0);
   const allAsseted = products.every((p) => {

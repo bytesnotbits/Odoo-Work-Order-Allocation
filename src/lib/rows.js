@@ -11,14 +11,16 @@ export function normalizeRow(r, idx = 0) {
     : productLineRaw || "").trim();
 
   const miGroup = String(r["MI Group"] ?? r["mi group"] ?? r["MI GROUP"] ?? r["group"] ?? r["Group"] ?? r["GROUP"] ?? "").trim();
-  const deliveryQty = Number(
-    r["Order Lines/Delivery Quantity"]
+
+  const qtyRaw = (
+    r["Quantity Charged"]
+    ?? r["Order Lines/Delivery Quantity"]
     ?? r["Delivered Qty"]
-    ?? r["Quantity Charged"]
     ?? r["Quantity"]
     ?? r["Qty Charged"]
-    ?? 0,
-  ) || 0;
+    ?? 0
+  );
+  const deliveryQty = parseNumber(qtyRaw);
   const cartQty = Number(r["Cart Quantity"] ?? r["Ordered Qty"] ?? 0) || 0;
   const status = String(r["Delivery Status"] ?? r["Status"] ?? "").trim();
   const creationDate = r["Creation Date"] ?? r["Date"] ?? null;
@@ -29,6 +31,19 @@ export function normalizeRow(r, idx = 0) {
   const desc = parsedDesc;
 
   return { workOrder, orderRef, productLine, itemCode, itemDesc, code, desc, deliveryQty, cartQty, status, creationDate, customer, group: miGroup };
+}
+
+function parseNumber(v) {
+  if (v === null || v === undefined) return 0;
+  if (typeof v === "number" && !Number.isNaN(v)) return v;
+  const str = String(v).trim();
+  if (!str) return 0;
+  // handle "(1,234.5)" as -1234.5 and strip commas
+  const isNeg = str.startsWith("(") && str.endsWith(")");
+  const cleaned = str.replace(/[(),]/g, "").trim();
+  const n = Number(cleaned);
+  if (Number.isNaN(n)) return 0;
+  return isNeg ? -n : n;
 }
 
 export function parseProductFromLine(line, explicitCode = "", explicitDesc = "") {
@@ -53,6 +68,7 @@ export function groupRows(rows) {
   const m = new Map();
   for (const r of rows) {
     if (!r.workOrder) continue;
+    if (r.deliveryQty === 0) continue;
     const { code, desc } = r.code && r.desc ? { code: r.code, desc: r.desc } : parseProductFromLine(r.productLine);
     if (!code && !desc) continue;
 
