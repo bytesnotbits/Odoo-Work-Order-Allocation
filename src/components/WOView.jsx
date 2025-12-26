@@ -5,7 +5,7 @@ import { naturalCompare } from "../lib/natural";
 
 export default function WOView({
   wo, grouped, getItemState, upsertAllocation, removeAllocation, setAssetId,
-  setAssetMeta, setReelSpan, getReelSpan, listReels, lockWorkOrder, tab, allocState
+  setAssetMeta, setReelSpan, getReelSpan, listReels, lockWorkOrder, tab, allocState, setCableMode
 }) {
   const gm = grouped.get(wo) || new Map();
   const products = Array.from(gm.values()).sort((a, b) => naturalCompare(a.code, b.code));
@@ -38,6 +38,7 @@ export default function WOView({
           setReelSpan={setReelSpan}
           getReelSpan={getReelSpan}
           listReels={listReels}
+          setCableMode={setCableMode}
           tab={tab}
           locked={(allocState[`${wo}|${p.code}`]?.locked) || false}
         />

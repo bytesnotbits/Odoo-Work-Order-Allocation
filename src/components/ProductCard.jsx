@@ -6,13 +6,13 @@ import { Plus, Trash2, Ruler } from "lucide-react";
 export default function ProductCard({
   wo, product, getItemState,
   upsertAllocation, removeAllocation, setAssetId, setAssetMeta,
-  setReelSpan, getReelSpan, listReels, tab, locked
+  setReelSpan, getReelSpan, listReels, setCableMode, tab, locked
 }) {
   // Avoid throwing in test environment where window.alert is "not implemented"
   const safeAlert = (msg) => {
     try { if (typeof window !== 'undefined' && typeof window.alert === 'function') window.alert(msg) } catch { /* no-op in tests */ }
   };
-  const { base, extra, totalAvailable, allocatedSum, remaining } = getItemState(wo, product.code);
+  const { base, extra, totalAvailable, allocatedSum, remaining, cableMode, cableSuggested } = getItemState(wo, product.code);
   const [allocQty, setAllocQty] = useState("");
   const [allocId, setAllocId] = useState("");
   const [allocCategory, setAllocCategory] = useState(ALLOCATION_OPTIONS[0]);
@@ -90,7 +90,7 @@ export default function ProductCard({
           <span>To Allocate: <b>{totalAvailable}</b></span>
           <span>Allocated: <b>{allocatedSum}</b></span>
           <span className={remaining === 0 ? "text-green-600" : "text-amber-600"}>Unallocated: <b>{remaining}</b></span>
-          {product.isCable && <Badge>Reel/Cable</Badge>}
+          {product.isCable && <Badge>Cable (auto-detected)</Badge>}
           {allocatedSum > totalAvailable && <span className="text-red-600 font-medium">Over-allocated — adjust allocations</span>}
         </div>
       </div>
@@ -101,7 +101,27 @@ export default function ProductCard({
           <div className="bg-gray-50 rounded-xl p-3 border">
             <div className="font-medium mb-2">Add allocation</div>
 
-            {!product.isCable && (
+            <div className="flex items-center gap-2 mb-3">
+              <label className="text-sm font-medium">Track by reel?</label>
+              <button
+                type="button"
+                className={[
+                  "px-3 py-1 rounded-lg border text-sm",
+                  cableMode ? "bg-gray-900 text-white" : "bg-white text-gray-700"
+                ].join(" ")}
+                onClick={() => setCableMode(wo, product.code, !cableMode)}
+                aria-pressed={cableMode}
+              >
+                {cableMode ? "Reel tracking on" : "Reel tracking off"}
+              </button>
+              {!cableMode && cableSuggested && (
+                <span className="text-xs text-amber-700 bg-amber-50 border border-amber-200 px-2 py-1 rounded">
+                  Looks like cable (description). Turn on if you need reels.
+                </span>
+              )}
+            </div>
+
+            {!cableMode && (
               <div className="space-y-2">
                 <label className="block text-sm">Quantity</label>
                 <input type="number" min={0} step={1} className="w-full border rounded-xl p-2" value={allocQty} onChange={(e) => setAllocQty(e.target.value)} />
@@ -133,7 +153,7 @@ export default function ProductCard({
               </div>
             )}
 
-            {product.isCable && (
+            {cableMode && (
               <div className="space-y-2">
                 {/* Reel & span */}
                 <div className="bg-white border rounded-xl p-3">

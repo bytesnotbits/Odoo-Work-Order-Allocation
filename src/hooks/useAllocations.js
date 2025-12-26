@@ -2,7 +2,7 @@ import { useState } from "react";
 import { uid } from "../lib/uid";
 
 export function useAllocations(grouped) {
-  // { "WO|CODE": { allocations: [], assets: { [allocId]: string | {assetId, coeLoc, rackBay, sepcat} }, reels: {}, locked: bool } }
+  // { "WO|CODE": { allocations: [], assets: { [allocId]: string | {assetId, coeLoc, rackBay, sepcat} }, reels: {}, locked: bool, cableMode: bool } }
   const [allocState, setAllocState] = useState({});
 
   const keyOf = (wo, code) => `${wo}|${code}`;
@@ -10,7 +10,7 @@ export function useAllocations(grouped) {
   const getItemState = (wo, code) => {
     const base = grouped.get(wo)?.get(code);
     const k = keyOf(wo, code);
-    const extra = allocState[k] || { allocations: [], assets: {}, reels: {}, coe: {}, locked: false };
+    const extra = allocState[k] || { allocations: [], assets: {}, reels: {}, coe: {}, locked: false, cableMode: false };
     const posted = base?.posted || 0;
     const returned = base?.returned || 0;
     const totalAvailable = Math.max(posted - returned, 0);
@@ -20,13 +20,22 @@ export function useAllocations(grouped) {
       return s + (a.type === "reel" ? a.footage : a.qty);
     }, 0);
     const remaining = Math.max(totalAvailable - allocatedSum, 0);
-      return { base, extra, totalAvailable, allocatedSum, remaining, overAllocated: allocatedSum > totalAvailable };
+      return {
+        base,
+        extra,
+        totalAvailable,
+        allocatedSum,
+        remaining,
+        overAllocated: allocatedSum > totalAvailable,
+        cableMode: extra.cableMode || false,
+        cableSuggested: !!base?.isCable,
+      };
   };
 
   const upsertAllocation = (wo, code, alloc) => {
     setAllocState(prev => {
       const k = keyOf(wo, code);
-      const cur = prev[k] || { allocations: [], assets: {}, locked: false, reels: {}, coe: {} };
+      const cur = prev[k] || { allocations: [], assets: {}, locked: false, reels: {}, coe: {}, cableMode: false };
       return { ...prev, [k]: { ...cur, allocations: [...cur.allocations, { id: uid(), ...alloc }] } };
     });
   };
@@ -34,7 +43,7 @@ export function useAllocations(grouped) {
   const removeAllocation = (wo, code, id) => {
     setAllocState(prev => {
       const k = keyOf(wo, code);
-      const cur = prev[k] || { allocations: [], assets: {}, locked: false, reels: {}, coe: {} };
+      const cur = prev[k] || { allocations: [], assets: {}, locked: false, reels: {}, coe: {}, cableMode: false };
       const { [id]: _, ...restCoe } = cur.coe || {};
       return { ...prev, [k]: { ...cur, allocations: cur.allocations.filter(a => a.id !== id), coe: restCoe } };
     });
@@ -44,7 +53,7 @@ export function useAllocations(grouped) {
   const setAssetId = (wo, code, allocId, assetId) => {
     setAllocState(prev => {
       const k = keyOf(wo, code);
-      const cur = prev[k] || { allocations: [], assets: {}, locked: false, reels: {} };
+      const cur = prev[k] || { allocations: [], assets: {}, locked: false, reels: {}, cableMode: false };
       const prevMeta = cur.assets?.[allocId];
       const meta = typeof prevMeta === 'object'
         ? { ...prevMeta, assetId }
@@ -57,7 +66,7 @@ export function useAllocations(grouped) {
   const setAssetMeta = (wo, code, allocId, fields) => {
     setAllocState(prev => {
       const k = keyOf(wo, code);
-      const cur = prev[k] || { allocations: [], assets: {}, locked: false, reels: {} };
+      const cur = prev[k] || { allocations: [], assets: {}, locked: false, reels: {}, cableMode: false };
       const prevMeta = cur.assets?.[allocId];
       const base = (typeof prevMeta === 'object')
         ? prevMeta
@@ -70,7 +79,7 @@ export function useAllocations(grouped) {
   const setReelSpan = (wo, code, reelSerial, start, end) => {
     setAllocState(prev => {
       const k = keyOf(wo, code);
-      const cur = prev[k] || { allocations: [], assets: {}, locked: false, reels: {} };
+      const cur = prev[k] || { allocations: [], assets: {}, locked: false, reels: {}, cableMode: false };
       return { ...prev, [k]: { ...cur, reels: { ...(cur.reels || {}), [reelSerial]: { start, end } } } };
     });
   };
@@ -83,6 +92,14 @@ export function useAllocations(grouped) {
     const k = keyOf(wo, code);
     const rec = allocState[k] || {};
     return Object.keys(rec.reels || {});
+  };
+
+  const setCableMode = (wo, code, enabled) => {
+    setAllocState(prev => {
+      const k = keyOf(wo, code);
+      const cur = prev[k] || { allocations: [], assets: {}, locked: false, reels: {}, coe: {}, cableMode: false };
+      return { ...prev, [k]: { ...cur, cableMode: !!enabled } };
+    });
   };
 
   // Validation + lock
@@ -188,6 +205,7 @@ export function useAllocations(grouped) {
     getItemState,
     upsertAllocation,
     removeAllocation,
+    setCableMode,
     setAssetId,
     setAssetMeta,
     setReelSpan,

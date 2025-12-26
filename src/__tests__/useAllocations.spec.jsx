@@ -121,3 +121,18 @@ test('custom allocations do not count toward allocated sum', () => {
   expect(s.allocatedSum).toBe(0);
   expect(s.remaining).toBe(2);
 });
+
+test('cableMode toggles independently of heuristic', () => {
+  const grouped = makeGrouped();
+  const { result } = renderHook(() => useAllocations(grouped));
+
+  // FIBER isCable: true but cableMode default should be false
+  let s = result.current.getItemState('WO1', '111');
+  expect(s.cableSuggested).toBe(true);
+  expect(s.cableMode).toBe(false);
+
+  act(() => result.current.setCableMode('WO1', '111', true));
+
+  s = result.current.getItemState('WO1', '111');
+  expect(s.cableMode).toBe(true);
+});
