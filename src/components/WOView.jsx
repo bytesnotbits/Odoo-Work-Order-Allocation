@@ -62,7 +62,12 @@ export default function WOView({
           onClick={() => lockWorkOrder(wo)}
           disabled={anyOverAllocated || anyUnallocated}
           title={(anyOverAllocated || anyUnallocated) ? "Resolve issues before completion" : ""}
-          className="ml-auto px-3 py-2 rounded-xl border disabled:opacity-50"
+          className={[
+            "ml-auto px-3 py-2 rounded-xl border shadow-sm disabled:opacity-50",
+            (anyOverAllocated || anyUnallocated)
+              ? "bg-gray-100 text-gray-500 border-gray-200"
+              : "bg-gray-900 text-white border-gray-900 hover:bg-gray-800 active:bg-gray-700"
+          ].join(" ")}
         >
           Mark complete
         </button>

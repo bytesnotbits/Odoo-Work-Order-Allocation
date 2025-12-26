@@ -31,6 +31,13 @@ export default function ProductCard({
   const spanEndNum = isFinite(Number(currentSpan.end)) ? Number(currentSpan.end) : null;
   const spanMin = spanStartNum !== null && spanEndNum !== null ? Math.min(spanStartNum, spanEndNum) : null;
   const spanMax = spanStartNum !== null && spanEndNum !== null ? Math.max(spanStartNum, spanEndNum) : null;
+  const primaryButton = [
+    "inline-flex items-center gap-2 px-3 py-2 rounded-xl border transition font-semibold shadow-sm",
+    "bg-blue-600 text-white border-blue-600",
+    "hover:bg-blue-700 active:bg-blue-800",
+    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500",
+    "disabled:bg-blue-200 disabled:border-blue-200 disabled:text-white disabled:cursor-not-allowed",
+  ].join(" ");
 
   const finalCategory = () =>
     allocCategory === "__custom__" ? (allocCategoryCustom || "Custom") : allocCategory;
@@ -106,8 +113,10 @@ export default function ProductCard({
               <button
                 type="button"
                 className={[
-                  "px-3 py-1 rounded-lg border text-sm",
-                  cableMode ? "bg-gray-900 text-white" : "bg-white text-gray-700"
+                  "px-3 py-1 rounded-lg border text-sm transition font-semibold shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-slate-900",
+                  cableMode
+                    ? "bg-slate-900 text-white border-slate-900 hover:bg-slate-800"
+                    : "bg-white text-slate-900 border-slate-300 hover:bg-slate-50"
                 ].join(" ")}
                 onClick={() => setCableMode(wo, product.code, !cableMode)}
                 aria-pressed={cableMode}
@@ -142,9 +151,7 @@ export default function ProductCard({
                 <button
                   type="button"
                   onClick={addRegular}
-                  className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border bg-white text-gray-700 shadow-sm
-                             hover:bg-gray-50 active:bg-gray-100
-                             focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50"
+                  className={primaryButton}
                   aria-label="Add Span"
                 >
                   <Plus className="w-4 h-4" aria-hidden="true" />
@@ -181,7 +188,7 @@ export default function ProductCard({
                       const s = Number(spanStartInput); const e = Number(spanEndInput);
                     if (!isFinite(s) || !isFinite(e)) return safeAlert("Enter numeric span start/end");
                       setReelSpan(wo, product.code, reelSerial, s, e);
-                    }} className="px-3 py-1 rounded-lg border">Save span</button>
+                    }} className={primaryButton + " px-3 py-1"}>Save span</button>
                   </div>
                   {/* Coverage summary */}
                   {(() => {
@@ -221,7 +228,7 @@ export default function ProductCard({
                 </div>
                 <label className="block text-sm mt-2">Reel/Serial Number <span className="text-red-500">*</span></label>
                 <input className="w-full border rounded-xl p-2" value={reelSerial} onChange={(e) => setReelSerial(e.target.value)} placeholder="REEL-XXXXX" />
-                <button disabled={locked} onClick={addReelPiece} className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-gray-900 text-white disabled:opacity-50"><Plus className="w-4 h-4" /> Add piece</button>
+                <button disabled={locked} onClick={addReelPiece} className={primaryButton}><Plus className="w-4 h-4" /> Add piece</button>
               </div>
             )}
           </div>
