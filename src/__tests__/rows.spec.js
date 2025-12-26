@@ -63,6 +63,16 @@ test('groupRows skips MI Group EXPT - EXEMPT lines', () => {
   expect(g.get('WO1').has('ABC')).toBe(true);
 });
 
+test('groupRows skips lines when MI Group value is EXPT', () => {
+  const rows = [
+    normalizeRow({ 'WORK ORDER':'WO1', 'Item':'FEE1', 'Item Description':'Misc fee', 'Quantity Charged': 1, 'MI Group':'EXPT' }),
+    normalizeRow({ 'WORK ORDER':'WO1', 'Item':'ABC', 'Item Description':'Actual item', 'Quantity Charged': 2 }),
+  ];
+  const g = groupRows(rows);
+  expect(g.get('WO1').size).toBe(1);
+  expect(g.get('WO1').has('ABC')).toBe(true);
+});
+
 test('rows without item code get unique per-line code to avoid lumping', () => {
   const rows = [
     normalizeRow({ 'WORK ORDER':'WO1', 'Item Description':'Pole', 'Quantity Charged': 3 }, 0),

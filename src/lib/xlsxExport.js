@@ -59,9 +59,10 @@ async function downloadWorkbook(workbook, filename) {
   setTimeout(() => URL.revokeObjectURL(link.href), 1000);
 }
 
-async function createRealWorkbook() {
-  const ExcelJS = (await import("exceljs")).default;
-  return new ExcelJS.Workbook();
+import ExcelJS from "exceljs/dist/exceljs.min.js";
+
+function createRealWorkbook() {
+  return Promise.resolve(new ExcelJS.Workbook());
 }
 
 export async function exportAllocationsToXLSX(

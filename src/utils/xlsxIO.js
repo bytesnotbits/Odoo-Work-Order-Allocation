@@ -1,19 +1,77 @@
+import ExcelJS from 'exceljs/dist/exceljs.min.js';
+
 const MIME_XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
 async function loadWorkbook(file) {
-  const ExcelJS = (await import('exceljs')).default;
   const workbook = new ExcelJS.Workbook();
-  const buffer = await file.arrayBuffer();
 
   const name = file.name?.toLowerCase() || '';
   if (name.endsWith('.csv') || file.type === 'text/csv') {
-    const text = new TextDecoder().decode(buffer);
-    await workbook.csv.read(text);
-  } else {
-    await workbook.xlsx.load(buffer);
+    // ExcelJS wants a stream for CSV; parse manually for reliability in the browser.
+    const text = await file.text();
+    return textToWorkbook(text);
   }
 
+  const buffer = await file.arrayBuffer();
+  await workbook.xlsx.load(buffer);
   return workbook;
+}
+
+function textToWorkbook(text) {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet('Sheet1');
+  const rows = parseCsv(text);
+  rows.forEach((r) => sheet.addRow(r));
+  return workbook;
+}
+
+function parseCsv(text) {
+  const rows = [];
+  let current = [];
+  let field = '';
+  let inQuotes = false;
+
+  const flushField = () => {
+    current.push(field);
+    field = '';
+  };
+
+  const flushRow = () => {
+    rows.push(current);
+    current = [];
+  };
+
+  for (let i = 0; i < text.length; i += 1) {
+    const ch = text[i];
+    const next = text[i + 1];
+    if (inQuotes) {
+      if (ch === '"' && next === '"') {
+        field += '"';
+        i += 1;
+      } else if (ch === '"') {
+        inQuotes = false;
+      } else {
+        field += ch;
+      }
+    } else {
+      if (ch === '"') {
+        inQuotes = true;
+      } else if (ch === ',') {
+        flushField();
+      } else if (ch === '\n') {
+        flushField();
+        flushRow();
+      } else if (ch === '\r') {
+        // ignore
+      } else {
+        field += ch;
+      }
+    }
+  }
+  // flush remaining
+  flushField();
+  if (current.length > 1 || current[0] !== '') flushRow();
+  return rows;
 }
 
 function sheetToJson(sheet) {
@@ -42,7 +100,6 @@ export async function readFirstSheet(file) {
 }
 
 export async function exportAllocationsToXLSX(rows, filename = `allocations_${Date.now()}.xlsx`) {
-  const ExcelJS = (await import('exceljs')).default;
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet('Allocations');
 

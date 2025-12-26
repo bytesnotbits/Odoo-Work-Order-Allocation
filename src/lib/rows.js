@@ -59,7 +59,8 @@ export function groupRows(rows) {
     // Skip MI Group exempt/tax lines
     const gLabel = (r.group || "").toLowerCase();
     const lineLabel = (r.productLine || r.desc || "").toLowerCase();
-    if ((gLabel === "mi group" && lineLabel === "expt - exempt") || lineLabel === "expt - exempt") continue;
+    const isExempt = gLabel.includes("expt") || gLabel.includes("exempt") || lineLabel.includes("expt - exempt");
+    if (isExempt) continue;
 
     if (!m.has(r.workOrder)) m.set(r.workOrder, new Map());
     const gm = m.get(r.workOrder);
