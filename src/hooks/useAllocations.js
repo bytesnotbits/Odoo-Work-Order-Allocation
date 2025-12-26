@@ -189,6 +189,7 @@ export function useAllocations(grouped) {
     upsertAllocation,
     removeAllocation,
     setAssetId,
+    setAssetMeta,
     setReelSpan,
     getReelSpan,
     listReels,

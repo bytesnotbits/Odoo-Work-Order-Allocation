@@ -1,25 +1,12 @@
 {/* Test the XLSX export with a mock */}
 
-import { exportAllocationsToXLSX } from '../lib/xlsxExport'
+import { exportAllocationsToXLSX, buildAllocationRows } from '../lib/xlsxExport';
 
-// 1) Mock first (Vitest hoists this automatically)
-vi.mock('xlsx', () => {
-  const utils = {
-    json_to_sheet: vi.fn(() => ({})),
-    book_new: vi.fn(() => ({})),
-    book_append_sheet: vi.fn(),
-  };
-  return {
-    utils,
-    writeFile: vi.fn(),
-  };
+beforeEach(() => {
+  vi.clearAllMocks();
 });
 
-// 2) Then import the (mocked) module
-import * as XLSX from 'xlsx';
-import { exportAllocationsToXLSX } from '../lib/xlsxExport';
-
-test('export creates a sheet with rows', () => {
+test('export creates a sheet with rows', async () => {
   const grouped = new Map();
   const inner = new Map();
   inner.set('111', { code: '111', desc: 'FIBER', posted: 8, returned: 0 });
@@ -36,16 +23,25 @@ test('export creates a sheet with rows', () => {
     },
   });
 
-  exportAllocationsToXLSX({
-    workOrders: ['WO1'],
-    grouped,
-    getItemState,
-    keyOf,
-    allocState,
-  });
+  const addRow = vi.fn();
+  const addWorksheet = vi.fn(() => ({ addRow, columns: [] }));
+  const workbook = { addWorksheet, xlsx: { writeBuffer: vi.fn(() => Promise.resolve(new ArrayBuffer(0))) } };
+  const download = vi.fn(() => Promise.resolve());
 
-  expect(XLSX.utils.json_to_sheet).toHaveBeenCalled();
-  expect(XLSX.writeFile).toHaveBeenCalled();
+  await exportAllocationsToXLSX(
+    {
+      workOrders: ['WO1'],
+      grouped,
+      getItemState,
+      keyOf,
+      allocState,
+    },
+    { createWorkbook: () => workbook, download },
+  );
+
+  expect(addWorksheet).toHaveBeenCalledWith('Allocations');
+  expect(addRow).toHaveBeenCalled();
+  expect(download).toHaveBeenCalledWith(workbook, expect.stringMatching(/allocations_/));
 });
 
 test('export maps asset meta (COE fields)', () => {
@@ -64,8 +60,7 @@ test('export maps asset meta (COE fields)', () => {
     }
   };
 
-  exportAllocationsToXLSX({ workOrders:['WO1'], grouped, getItemState, keyOf, allocState });
-  const rowsArg = XLSX.utils.json_to_sheet.mock.calls[0][0];
+  const rowsArg = buildAllocationRows({ workOrders:['WO1'], grouped, getItemState, keyOf, allocState });
   expect(rowsArg[0]).toMatchObject({
     AssetId: 'AS-1', COE_LOC:'LOC1', RACK_BAY:'R1B2', SEPCAT:'CAT-A'
   });

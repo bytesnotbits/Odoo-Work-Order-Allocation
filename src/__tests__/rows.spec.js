@@ -9,13 +9,15 @@ test('parseProductFromLine extracts [code] and description', () => {
 test('normalizeRow maps columns and types', () => {
   const r = normalizeRow({
     'WORK ORDER': '11880',
-    'Order Lines': '...[1396R] Fiber...',
-    'Order Lines/Delivery Quantity': '10',
+    'Item': '1396R',
+    'Item Description': 'Fiber...',
+    'Quantity Charged': '10',
     Customer: 'Acme'
   })
   expect(r.workOrder).toBe('11880')
   expect(r.deliveryQty).toBe(10)
   expect(r.customer).toBe('Acme')
+  expect(r.code).toBe('1396R')
 })
 
 test('isReturnRow detects negative qty and "Return" lines', () => {
@@ -49,4 +51,23 @@ test('normalizeRow + groupRows captures group column', () => {
   const g = groupRows(rows);
   const item = g.get('WO1').get('111');
   expect(item.group).toBe('SCXR');
+});
+
+test('groupRows skips MI Group EXPT - EXEMPT lines', () => {
+  const rows = [
+    normalizeRow({ 'WORK ORDER':'WO1', 'Item Description':'EXPT - EXEMPT', 'Quantity Charged': 5, 'MI Group':'MI Group' }),
+    normalizeRow({ 'WORK ORDER':'WO1', 'Item':'ABC', 'Item Description':'Actual item', 'Quantity Charged': 2 }),
+  ];
+  const g = groupRows(rows);
+  expect(g.get('WO1').size).toBe(1);
+  expect(g.get('WO1').has('ABC')).toBe(true);
+});
+
+test('rows without item code get unique per-line code to avoid lumping', () => {
+  const rows = [
+    normalizeRow({ 'WORK ORDER':'WO1', 'Item Description':'Pole', 'Quantity Charged': 3 }, 0),
+    normalizeRow({ 'WORK ORDER':'WO1', 'Item Description':'Pole', 'Quantity Charged': 4 }, 1),
+  ];
+  const g = groupRows(rows);
+  expect(g.get('WO1').size).toBe(2);
 });

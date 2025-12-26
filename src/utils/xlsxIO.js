@@ -1,15 +1,61 @@
+const MIME_XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+
+async function loadWorkbook(file) {
+  const ExcelJS = (await import('exceljs')).default;
+  const workbook = new ExcelJS.Workbook();
+  const buffer = await file.arrayBuffer();
+
+  const name = file.name?.toLowerCase() || '';
+  if (name.endsWith('.csv') || file.type === 'text/csv') {
+    const text = new TextDecoder().decode(buffer);
+    await workbook.csv.read(text);
+  } else {
+    await workbook.xlsx.load(buffer);
+  }
+
+  return workbook;
+}
+
+function sheetToJson(sheet) {
+  if (!sheet) return [];
+  const headers = sheet.getRow(1).values.slice(1).map((h) => (h ?? '').toString());
+  const rows = [];
+  for (let i = 2; i <= sheet.rowCount; i += 1) {
+    const row = sheet.getRow(i);
+    const values = row.values;
+    const entry = {};
+    headers.forEach((header, idx) => {
+      if (!header) return;
+      const val = values[idx + 1];
+      entry[header] = val ?? null;
+    });
+    // Include rows even if empty to mirror previous behavior with defval: null
+    if (Object.keys(entry).length > 0) rows.push(entry);
+  }
+  return rows;
+}
+
 export async function readFirstSheet(file) {
-  const XLSX = await import('xlsx');
-  const data = new Uint8Array(await file.arrayBuffer());
-  const wb = XLSX.read(data, { type: 'array' });
-  const sheet = wb.Sheets[wb.SheetNames[0]];
-  return XLSX.utils.sheet_to_json(sheet, { defval: null });
+  const workbook = await loadWorkbook(file);
+  const sheet = workbook.worksheets[0];
+  return sheetToJson(sheet);
 }
 
 export async function exportAllocationsToXLSX(rows, filename = `allocations_${Date.now()}.xlsx`) {
-  const XLSX = await import('xlsx');
-  const ws = XLSX.utils.json_to_sheet(rows);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Allocations');
-  XLSX.writeFile(wb, filename);
+  const ExcelJS = (await import('exceljs')).default;
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet('Allocations');
+
+  if (rows.length > 0) {
+    sheet.columns = Object.keys(rows[0]).map((key) => ({ header: key, key }));
+    rows.forEach((row) => sheet.addRow(row));
+  }
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  const blob = new Blob([buffer], { type: MIME_XLSX });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = filename;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(link.href), 1000);
 }

@@ -1,6 +1,6 @@
-import * as XLSX from "xlsx";
+const MIME_XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
-export function exportAllocationsToXLSX({ workOrders, grouped, getItemState, keyOf, allocState }) {
+export function buildAllocationRows({ workOrders, grouped, getItemState, keyOf, allocState }) {
   const out = [];
   for (const wo of workOrders) {
     const gm = grouped.get(wo);
@@ -23,7 +23,7 @@ export function exportAllocationsToXLSX({ workOrders, grouped, getItemState, key
           // assets map can store a string or an object with meta
           ...(() => {
             const v = (allocState[k]?.assets || {})[a.id];
-            if (typeof v === 'object') {
+            if (typeof v === "object") {
               return {
                 AssetId: v.assetId || "",
                 COE_LOC: v.coeLoc || "",
@@ -46,9 +46,41 @@ export function exportAllocationsToXLSX({ workOrders, grouped, getItemState, key
     row.ReelSpanStart = rs ? rs.start : "";
     row.ReelSpanEnd = rs ? rs.end : "";
   }
+  return out;
+}
 
-  const ws = XLSX.utils.json_to_sheet(out);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Allocations");
-  XLSX.writeFile(wb, `allocations_${Date.now()}.xlsx`);
+async function downloadWorkbook(workbook, filename) {
+  const buffer = await workbook.xlsx.writeBuffer();
+  const blob = new Blob([buffer], { type: MIME_XLSX });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = filename;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+}
+
+async function createRealWorkbook() {
+  const ExcelJS = (await import("exceljs")).default;
+  return new ExcelJS.Workbook();
+}
+
+export async function exportAllocationsToXLSX(
+  { workOrders, grouped, getItemState, keyOf, allocState },
+  {
+    createWorkbook = createRealWorkbook,
+    download = downloadWorkbook,
+    filename = `allocations_${Date.now()}.xlsx`,
+  } = {},
+) {
+  const rows = buildAllocationRows({ workOrders, grouped, getItemState, keyOf, allocState });
+  const wb = await createWorkbook();
+  const ws = wb.addWorksheet("Allocations");
+
+  if (rows.length > 0) {
+    ws.columns = Object.keys(rows[0]).map((key) => ({ header: key, key }));
+    rows.forEach((row) => ws.addRow(row));
+  }
+
+  await download(wb, filename);
+  return rows;
 }

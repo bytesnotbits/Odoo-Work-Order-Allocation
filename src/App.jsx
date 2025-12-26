@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { FileUp, Package2, Split, Download } from "lucide-react";
-import * as XLSX from "xlsx";
 
 import Section from "./components/Section";
 import Badge from "./components/Badge";
@@ -11,6 +10,7 @@ import { demoRows } from "./lib/data";
 import { normalizeRow, groupRows } from "./lib/rows";
 import { exportAllocationsToXLSX } from "./lib/xlsxExport";
 import { useAllocations } from "./hooks/useAllocations";
+import { readFirstSheet } from "./utils/xlsxIO";
 
 export default function App() {
   const [rawRows, setRawRows] = useState(demoRows);
@@ -29,19 +29,17 @@ export default function App() {
   const activeWO = selectedWO || workOrders[0] || "";
   
 
-  function handleFile(e) {
+  async function handleFile(e) {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      const data = new Uint8Array(evt.target.result);
-      const wb = XLSX.read(data, { type: "array" });
-      const sheet = wb.Sheets[wb.SheetNames[0]];
-      const json = XLSX.utils.sheet_to_json(sheet, { defval: null });
+    try {
+      const json = await readFirstSheet(file);
       setRawRows(json);
       setSelectedWO("");
-    };
-    reader.readAsArrayBuffer(file);
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error("Failed to read file", err);
+    }
   }
 
   function exportAllocations() {
@@ -51,6 +49,9 @@ export default function App() {
       getItemState,
       keyOf,
       allocState,
+    }).catch((err) => {
+      // eslint-disable-next-line no-console
+      console.error("Failed to export allocations", err);
     });
   }
 
