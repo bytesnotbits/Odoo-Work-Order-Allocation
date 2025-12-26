@@ -17,7 +17,7 @@ export default function WOView({
   });
   const anyOverAllocated = products.some((p) => {
     const s = getItemState(wo, p.code);
-    return s.allocatedSum > s.totalAvailable;
+    return s.netAllocated > s.totalAvailable;
   });
   const anyUnallocated = products.some((p) => getItemState(wo, p.code).remaining > 0);
 

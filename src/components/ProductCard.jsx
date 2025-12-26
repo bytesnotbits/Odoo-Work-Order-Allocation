@@ -12,7 +12,11 @@ export default function ProductCard({
   const safeAlert = (msg) => {
     try { if (typeof window !== 'undefined' && typeof window.alert === 'function') window.alert(msg) } catch { /* no-op in tests */ }
   };
-  const { base, extra, totalAvailable, allocatedSum, remaining, cableMode, cableSuggested } = getItemState(wo, product.code);
+  const {
+    base, extra, totalAvailable, allocatedSum,
+    pendingReturnSum, returnedSum, netAllocated, remaining,
+    cableMode, cableSuggested
+  } = getItemState(wo, product.code);
   const [allocQty, setAllocQty] = useState("");
   const [allocId, setAllocId] = useState("");
   const [allocCategory, setAllocCategory] = useState(ALLOCATION_OPTIONS[0]);
@@ -87,8 +91,12 @@ export default function ProductCard({
     });    setOuter(""); setInner(""); setAllocId(""); setReelSerial(""); setAllocCategory(ALLOCATION_OPTIONS[0]); setAllocCategoryCustom("");
   }
 
+  const cardStateClasses = remaining === 0
+    ? "bg-green-50 border-green-200"
+    : "bg-white border-gray-200";
+
   return (
-    <div className="border rounded-2xl p-4">
+    <div className={`rounded-2xl p-4 border ${cardStateClasses}`}>
       <div className="flex-1">
         <div className="font-semibold text-base md:text-lg">[{product.code}] {product.desc || "Unnamed"}</div>
         <div className="text-sm text-gray-600 flex flex-wrap gap-3 mt-1">
@@ -98,7 +106,27 @@ export default function ProductCard({
           <span>Allocated: <b>{allocatedSum}</b></span>
           <span className={remaining === 0 ? "text-green-600" : "text-amber-600"}>Unallocated: <b>{remaining}</b></span>
           {product.isCable && <Badge>Cable (auto-detected)</Badge>}
-          {allocatedSum > totalAvailable && <span className="text-red-600 font-medium">Over-allocated — adjust allocations</span>}
+          {netAllocated > totalAvailable && <span className="text-red-600 font-medium">Over-allocated — adjust allocations</span>}
+        </div>
+        <div className="flex flex-wrap gap-2 mt-2 text-xs">
+          <span
+            className="px-2 py-1 rounded-full border border-yellow-200 bg-yellow-50 text-yellow-700"
+            title="Footage marked as pending return"
+          >
+            Pending return: <b>{pendingReturnSum}</b>
+          </span>
+          <span
+            className="px-2 py-1 rounded-full border border-blue-200 bg-blue-50 text-blue-700"
+            title="Footage already recorded as returned"
+          >
+            Returned: <b>{returnedSum}</b>
+          </span>
+          <span
+            className="px-2 py-1 rounded-full border border-sky-200 bg-sky-50 text-sky-700"
+            title="Net footage counted toward remaining"
+          >
+            Net allocated: <b>{netAllocated}</b>
+          </span>
         </div>
       </div>
 
@@ -174,11 +202,11 @@ export default function ProductCard({
                       )}
                     </div>
                     <div>
-                      <label className="block text-sm">Span start sequence</label>
+                      <label className="block text-sm">Inner Seq</label>
                       <input type="number" className="w-full border rounded-xl p-2" value={spanStartInput} onChange={(e)=>setSpanStartInput(e.target.value)} />
                     </div>
                     <div>
-                      <label className="block text-sm">Span end sequence</label>
+                      <label className="block text-sm">Outer Seq</label>
                       <input type="number" className="w-full border rounded-xl p-2" value={spanEndInput} onChange={(e)=>setSpanEndInput(e.target.value)} />
                     </div>
                   </div>
@@ -209,10 +237,10 @@ export default function ProductCard({
 
                 {/* Reel piece */}
                 <div className="flex items-center gap-2"><Ruler className="w-4 h-4" /> <div className="font-medium">Reel piece</div></div>
-                <label className="block text-sm">Outer Sequence</label>
-                <input type="number" className="w-full border rounded-xl p-2" value={outer} onChange={(e) => setOuter(e.target.value)} />
-                <label className="block text-sm">Inner Sequence</label>
+                <label className="block text-sm">Inner Seq</label>
                 <input type="number" className="w-full border rounded-xl p-2" value={inner} onChange={(e) => setInner(e.target.value)} />
+                <label className="block text-sm">Outer Seq</label>
+                <input type="number" className="w-full border rounded-xl p-2" value={outer} onChange={(e) => setOuter(e.target.value)} />
                 <div className="text-sm text-gray-600">Footage = |Inner − Outer| → <b>{reelFootage}</b></div>
                 <label className="block text-sm">Allocation notes (optional)</label>
                 <input className="w-full border rounded-xl p-2" value={allocId} onChange={(e) => setAllocId(e.target.value)} placeholder="e.g., AERIAL-SPAN-12" />

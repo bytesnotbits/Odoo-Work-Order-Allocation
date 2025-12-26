@@ -1,5 +1,5 @@
 // Constants + demo data
-export const ALLOCATION_OPTIONS = ["Aerial", "Buried", "Underground", "Removal"];
+export const ALLOCATION_OPTIONS = ["Aerial", "Buried", "Underground", "Removal", "Pending return", "Returned"];
 // COE SepCat choices (placeholder — tweak to your list)
 export const SEPCAT_OPTIONS = ["PROVISION", "SCRAP", "REDEPLOY", "UNKNOWN"];
 

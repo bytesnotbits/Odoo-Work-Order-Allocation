@@ -14,22 +14,57 @@ export function useAllocations(grouped) {
     const posted = base?.posted || 0;
     const returned = base?.returned || 0;
     const totalAvailable = Math.max(posted - returned, 0);
-    const allocatedSum = extra.allocations.reduce((s, a) => {
-      // New rule: if it came from the "Custom…" path, don't count it.
-      if (a.allocationCategoryIsCustom) return s;
-      return s + (a.type === "reel" ? a.footage : a.qty);
-    }, 0);
-    const remaining = Math.max(totalAvailable - allocatedSum, 0);
-      return {
-        base,
-        extra,
-        totalAvailable,
-        allocatedSum,
-        remaining,
-        overAllocated: allocatedSum > totalAvailable,
-        cableMode: extra.cableMode || false,
-        cableSuggested: !!base?.isCable,
-      };
+    const allocationAmount = (alloc) => {
+      if (alloc.type === "reel") {
+        if (Number.isFinite(alloc.footage)) return Math.abs(alloc.footage);
+        if (alloc.outer != null && alloc.inner != null) {
+          const o = Number(alloc.outer);
+          const i = Number(alloc.inner);
+          if (Number.isFinite(o) && Number.isFinite(i)) {
+            return Math.abs(o - i);
+          }
+        }
+        return 0;
+      }
+      return Number(alloc.qty) || 0;
+    };
+
+    const totals = extra.allocations.reduce(
+      (acc, alloc) => {
+        const amount = allocationAmount(alloc);
+        if (alloc.allocationCategoryIsCustom) return acc;
+        if (alloc.allocationCategory === "Pending return") {
+          acc.pending += amount;
+          return acc;
+        }
+        if (alloc.allocationCategory === "Returned") {
+          acc.returned += amount;
+          return acc;
+        }
+        acc.installed += amount;
+        return acc;
+      },
+      { installed: 0, pending: 0, returned: 0 }
+    );
+
+    const allocatedSum = totals.installed;
+    const returnedSum = totals.returned;
+    const pendingReturnSum = totals.pending;
+    const netAllocated = allocatedSum - returnedSum;
+    const remaining = Math.max(totalAvailable - netAllocated, 0);
+    return {
+      base,
+      extra,
+      totalAvailable,
+      allocatedSum,
+      pendingReturnSum,
+      returnedSum,
+      netAllocated,
+      remaining,
+      overAllocated: netAllocated > totalAvailable,
+      cableMode: extra.cableMode || false,
+      cableSuggested: !!base?.isCable,
+    };
   };
 
   const upsertAllocation = (wo, code, alloc) => {
@@ -112,8 +147,8 @@ export function useAllocations(grouped) {
     // (1) over / unallocated
     for (const [code] of gm) {
       const s = getItemState(wo, code);
-      if (s.allocatedSum > s.totalAvailable) {
-        issues.push(`Over-allocated on [${code}]: allocations (${s.allocatedSum}) exceed available (${s.totalAvailable}).`);
+      if (s.netAllocated > s.totalAvailable) {
+        issues.push(`Over-allocated on [${code}]: allocations (${s.netAllocated}) exceed available (${s.totalAvailable}).`);
       }
       if (s.remaining > 0) {
         issues.push(`Unallocated material on [${code}]: remaining ${s.remaining}.`);

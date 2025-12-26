@@ -122,6 +122,40 @@ test('custom allocations do not count toward allocated sum', () => {
   expect(s.remaining).toBe(2);
 });
 
+test('pending return entries do not consume remaining footage', () => {
+  const grouped = makeGrouped();
+  const { result } = renderHook(() => useAllocations(grouped));
+
+  act(() => {
+    result.current.upsertAllocation('WO1','190',{
+      type: 'regular',
+      qty: 1,
+      allocationCategory: 'Pending return'
+    });
+  });
+
+  const s = result.current.getItemState('WO1','190');
+  expect(s.allocatedSum).toBe(0);
+  expect(s.pendingReturnSum).toBe(1);
+  expect(s.remaining).toBe(2);
+});
+
+test('returned allocations add footage back into remaining', () => {
+  const grouped = makeGrouped();
+  const { result } = renderHook(() => useAllocations(grouped));
+
+  act(() => {
+    result.current.upsertAllocation('WO1','190',{ type:'regular', qty:2, allocationCategory:'Aerial' });
+    result.current.upsertAllocation('WO1','190',{ type:'regular', qty:1, allocationCategory:'Returned' });
+  });
+
+  const s = result.current.getItemState('WO1','190');
+  expect(s.allocatedSum).toBe(2);
+  expect(s.returnedSum).toBe(1);
+  expect(s.netAllocated).toBe(1);
+  expect(s.remaining).toBe(1);
+});
+
 test('cableMode toggles independently of heuristic', () => {
   const grouped = makeGrouped();
   const { result } = renderHook(() => useAllocations(grouped));

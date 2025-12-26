@@ -4,7 +4,7 @@ import ProductCard from '../components/ProductCard.jsx';
 
 // Mock ALLOCATION_OPTIONS used by the component
 vi.mock('../lib/data', () => ({
-      ALLOCATION_OPTIONS: ['Aerial', 'Underground', 'Inside Plant'],
+      ALLOCATION_OPTIONS: ['Aerial', 'Buried', 'Underground', 'Removal', 'Pending return', 'Returned'],
 }));
 
 function renderProductCard(overrides = {}) {
