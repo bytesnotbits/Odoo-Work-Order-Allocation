@@ -44,7 +44,7 @@ test('typed custom categories do not count toward allocated', () => {
       type:'regular',
       qty:2,
       allocationCategory:'SCRAP',        // arbitrary user text
-      allocationCategoryIsCustom:true    // the flag is what makes it "non-allocating"
+      allocationCategoryIsCustom:true    // the flag makes it non-allocating
     })
   })
 
@@ -103,25 +103,6 @@ test('lockWorkOrder succeeds when everything allocated & asseted', () => {
   expect(msg).toMatch(/marked complete/i)
 })
 
-test('custom allocations do not count toward allocated sum', () => {
-  const grouped = makeGrouped();
-  const { result } = renderHook(() => useAllocations(grouped));
-
-  act(() => {
-    result.current.upsertAllocation('WO1','190',{
-      type:'regular',
-      qty:1,
-      qty:1,
-      allocationCategory:'Custom',       // label is irrelevant
-      allocationCategoryIsCustom:true    // this flag makes it ignored
-    });
-  });
-
-  const s = result.current.getItemState('WO1','190');
-  expect(s.allocatedSum).toBe(0);
-  expect(s.remaining).toBe(2);
-});
-
 test('pending return entries do not consume remaining footage', () => {
   const grouped = makeGrouped();
   const { result } = renderHook(() => useAllocations(grouped));
@@ -130,7 +111,7 @@ test('pending return entries do not consume remaining footage', () => {
     result.current.upsertAllocation('WO1','190',{
       type: 'regular',
       qty: 1,
-      allocationCategory: 'Pending return'
+      allocationCategory: 'Pending'
     });
   });
 
@@ -165,7 +146,7 @@ test('addReelAllocation splits pending return spans when returning a subset', ()
       type: 'reel',
       outer: 0,
       inner: 5000,
-      allocationCategory: 'Pending return',
+      allocationCategory: 'Pending',
       reelSerial: 'R1',
       footage: 5000,
     });
@@ -190,7 +171,7 @@ test('addReelAllocation splits pending return spans when returning a subset', ()
   expect(returnedPiece).toBeTruthy();
   expect(Math.min(returnedPiece.inner, returnedPiece.outer)).toBe(0);
   expect(Math.max(returnedPiece.inner, returnedPiece.outer)).toBe(2600);
-  const pendingPiece = allocations.find((a) => a.allocationCategory === 'Pending return');
+  const pendingPiece = allocations.find((a) => a.allocationCategory === 'Pending');
   expect(pendingPiece).toBeTruthy();
   expect(Math.min(pendingPiece.inner, pendingPiece.outer)).toBe(2600);
   expect(Math.max(pendingPiece.inner, pendingPiece.outer)).toBe(5000);
@@ -224,7 +205,7 @@ test('addReelAllocation keeps the ID when replacing a reel entry', () => {
       type: 'reel',
       outer: 0,
       inner: 5000,
-      allocationCategory: 'Pending return',
+      allocationCategory: 'Pending',
       reelSerial: 'R1',
       footage: 5000,
     });
@@ -246,7 +227,7 @@ test('addReelAllocation keeps the ID when replacing a reel entry', () => {
   const returned = allocations.find((a) => a.allocationCategory === 'Returned');
   expect(returned).toBeTruthy();
   expect(returned.id).toBe(pendingAlloc.id);
-  const pendingRemaining = allocations.find((a) => a.allocationCategory === 'Pending return');
+  const pendingRemaining = allocations.find((a) => a.allocationCategory === 'Pending');
   expect(pendingRemaining).toBeTruthy();
   expect(Math.min(pendingRemaining.inner, pendingRemaining.outer)).toBe(2600);
 });

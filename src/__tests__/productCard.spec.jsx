@@ -4,7 +4,7 @@ import ProductCard from '../components/ProductCard.jsx';
 
 // Mock ALLOCATION_OPTIONS used by the component
 vi.mock('../lib/data', () => ({
-      ALLOCATION_OPTIONS: ['Aerial', 'Buried', 'Underground', 'Removal', 'Pending return', 'Returned'],
+      ALLOCATION_OPTIONS: ['Aerial', 'Buried', 'Underground', 'Removal', 'Pending', 'Returned'],
       isMiscProductCode: () => false,
 }));
 

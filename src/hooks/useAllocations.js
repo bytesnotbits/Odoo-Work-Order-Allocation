@@ -35,7 +35,7 @@ export function useAllocations(grouped) {
       (acc, alloc) => {
         const amount = allocationAmount(alloc);
         if (alloc.allocationCategoryIsCustom) return acc;
-        if (alloc.allocationCategory === "Pending return") {
+        if (alloc.allocationCategory === "Pending") {
           acc.pending += amount;
           return acc;
         }
@@ -268,7 +268,7 @@ export function useAllocations(grouped) {
       if (
         alloc.type !== "reel" ||
         serialKey !== reelSerialKey ||
-        alloc.allocationCategory !== "Pending return"
+        alloc.allocationCategory !== "Pending"
       ) {
         updated.push(alloc);
         continue;

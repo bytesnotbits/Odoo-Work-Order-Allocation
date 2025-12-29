@@ -79,7 +79,7 @@ export default function ProductCard({
   const finalCategory = () =>
     allocCategory === "__custom__" ? (allocCategoryCustom || "Custom") : allocCategory;
   const isCustomCategory = () => allocCategory === "__custom__";
-  const isReturnCategory = (category) => ["Returned", "Pending return"].includes(category);
+  const isReturnCategory = (category) => ["Returned", "Pending"].includes(category);
 
   function addRegular() {
     const qty = Number(allocQty);
@@ -191,9 +191,29 @@ export default function ProductCard({
     }
   };
 
-  const cardStateClasses = remaining === 0
-    ? "bg-green-50 border-green-200"
-    : "bg-white border-gray-200";
+  const hasUnresolvedQuantities = remaining > 0 || pendingReturnSum > 0;
+  const cardStateClasses = hasUnresolvedQuantities
+    ? "bg-white border-gray-200"
+    : "bg-green-50 border-green-200";
+
+  const totalPosted = Number(product.posted) || 0;
+  const toAllocateTone = hasUnresolvedQuantities ? "red" : "green";
+  const chipBase = "px-2 py-1 rounded-full border text-[11px] font-semibold uppercase tracking-wide";
+  const chipToneClasses = {
+    slate: "border-slate-200 bg-white text-slate-600",
+    blue: "border-blue-200 bg-blue-50 text-blue-700",
+    yellow: "border-yellow-200 bg-yellow-50 text-yellow-700",
+    emerald: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    red: "border-red-200 bg-red-50 text-red-700",
+    green: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  };
+  const summaryChips = [
+    { label: "Total", value: totalPosted, tone: "slate", title: "Total posted quantity" },
+    { label: "Returned", value: returnedSum, tone: "blue", title: "Reported returned quantity" },
+    { label: "Pending", value: pendingReturnSum, tone: "yellow", title: "Footage marked pending" },
+    { label: "Allocated", value: allocatedSum, tone: "emerald", title: "Footage recorded as allocated" },
+    { label: "To Allocate", value: remaining, tone: toAllocateTone, title: "Footage that still needs allocation" },
+  ];
 
   return (
     <div className={`rounded-2xl p-4 border ${cardStateClasses}`}>
@@ -222,40 +242,26 @@ export default function ProductCard({
             </button>
           )}
         </div>
-        <div className="text-sm text-gray-600 flex flex-wrap gap-3 mt-1">
-          <span>Total: <b>{product.posted}</b></span>
-          <span>Returned: <b>{product.returned}</b></span>
-          <span>To Allocate: <b>{totalAvailable}</b></span>
-          <span>Allocated: <b>{allocatedSum}</b></span>
-          <span className={remaining === 0 ? "text-green-600" : "text-amber-600"}>Unallocated: <b>{remaining}</b></span>
+        <div className="flex flex-wrap gap-2 mt-1 text-[11px]">
+          {summaryChips.map(({ label, value, tone, title }) => (
+            <span
+              key={label}
+              title={title}
+              className={`${chipBase} ${chipToneClasses[tone] || chipToneClasses.slate}`}
+            >
+              {label}: <b>{value}</b>
+            </span>
+          ))}
           {product.isCable && <Badge>Cable (auto-detected)</Badge>}
-          {netAllocated > totalAvailable && <span className="text-red-600 font-medium">Over-allocated — adjust allocations</span>}
+          {netAllocated > totalAvailable && (
+            <span className="text-red-600 font-medium">Over-allocated — adjust allocations</span>
+          )}
         </div>
         {isMiscProduct && (
           <div className="text-xs text-gray-500 mt-1 leading-snug">
             {MISC_PRODUCT_NOTE}
           </div>
         )}
-        <div className="flex flex-wrap gap-2 mt-2 text-xs">
-          <span
-            className="px-2 py-1 rounded-full border border-yellow-200 bg-yellow-50 text-yellow-700"
-            title="Footage marked as pending return"
-          >
-            Pending return: <b>{pendingReturnSum}</b>
-          </span>
-          <span
-            className="px-2 py-1 rounded-full border border-blue-200 bg-blue-50 text-blue-700"
-            title="Footage already recorded as returned"
-          >
-            Returned: <b>{returnedSum}</b>
-          </span>
-          <span
-            className="px-2 py-1 rounded-full border border-sky-200 bg-sky-50 text-sky-700"
-            title="Net footage counted toward remaining"
-          >
-            Net allocated: <b>{netAllocated}</b>
-          </span>
-        </div>
       </div>
 
       {tab === "engineering" && (
@@ -442,7 +448,7 @@ export default function ProductCard({
             ) : (
               <div className="space-y-3">
                 {extra.allocations.map((a) => {
-                const isPendingReturn = a.allocationCategory === "Pending return";
+                const isPendingReturn = a.allocationCategory === "Pending";
                 const isReturned = a.allocationCategory === "Returned";
                 const raw = (extra.assets && extra.assets[a.id]) || {};
                 const meta = typeof raw === "object"
