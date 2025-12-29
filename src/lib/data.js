@@ -2,6 +2,14 @@
 export const ALLOCATION_OPTIONS = ["Aerial", "Buried", "Underground", "Removal", "Pending return", "Returned"];
 // COE SepCat choices (placeholder — tweak to your list)
 export const SEPCAT_OPTIONS = ["PROVISION", "SCRAP", "REDEPLOY", "UNKNOWN"];
+export const MISC_PRODUCT_CODE = "MISC";
+export const MISC_PRODUCT_PREFIX = "MISC-";
+export const MISC_PRODUCT_DESC = "Miscellaneous material (provisional)";
+export const MISC_PRODUCT_NOTE = "Record material provided to the crew that has not yet been posted against the work order.";
+export const isMiscProductCode = (code) => {
+  if (typeof code !== "string") return false;
+  return code === MISC_PRODUCT_CODE || code.startsWith(MISC_PRODUCT_PREFIX);
+};
 
 export const demoRows = [
   { "Creation Date": "2025-10-17 09:58:20", "Customer": "Chris Lindemann Jr", "Delivery Status": "Fully Delivered", "Order Reference": "W001629", "Order Lines": "W001629 - [1396R] FO 288R RIBBON FIBER", "WORK ORDER": "11880", "Cart Quantity": 3896, "Order Lines/Delivery Quantity": 990 },

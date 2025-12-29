@@ -1,12 +1,13 @@
 import { useState } from "react";
-import { ALLOCATION_OPTIONS } from "../lib/data";
+import { ALLOCATION_OPTIONS, MISC_PRODUCT_NOTE, isMiscProductCode } from "../lib/data";
 import Badge from "./Badge";
 import { Plus, Trash2, Ruler } from "lucide-react";
 
 export default function ProductCard({
   wo, product, getItemState,
-  upsertAllocation, removeAllocation, setAssetId, setAssetMeta,
-  setReelSpan, removeReelSpan, getReelSpan, listReels, setCableMode, tab, locked
+  upsertAllocation, removeAllocation, setAssetMeta,
+  setReelSpan, removeReelSpan, getReelSpan, listReels, setCableMode, tab, locked,
+  isMiscRemovable = false, onRemoveMisc
 }) {
   // Avoid throwing in test environment where window.alert is "not implemented"
   const safeAlert = (msg) => {
@@ -18,6 +19,7 @@ export default function ProductCard({
     pendingReturnSum, returnedSum, netAllocated, remaining,
     cableMode, cableSuggested
   } = getItemState(wo, product.code);
+  const isMiscProduct = isMiscProductCode(product.code);
   const [allocQty, setAllocQty] = useState("");
   const [allocId, setAllocId] = useState("");
   const [allocCategory, setAllocCategory] = useState(ALLOCATION_OPTIONS[0]);
@@ -83,7 +85,7 @@ export default function ProductCard({
     if (!qty || qty <= 0) return safeAlert("Enter a positive quantity");
     const categoryName = finalCategory();
     const isReturn = isReturnCategory(categoryName);
-    if (!isReturn && qty > remaining) return safeAlert("Quantity exceeds remaining available");
+    if (!isReturn && !isMiscProduct && qty > remaining) return safeAlert("Quantity exceeds remaining available");
     upsertAllocation(wo, product.code, {
       type: "regular",
       qty,
@@ -99,7 +101,7 @@ export default function ProductCard({
     if (reelFootage <= 0) return safeAlert("Enter valid outer/inner to compute footage");
     const categoryName = finalCategory();
     const isReturn = isReturnCategory(categoryName);
-    if (!isReturn && reelFootage > remaining) return safeAlert("Footage exceeds remaining available");
+    if (!isReturn && !isMiscProduct && reelFootage > remaining) return safeAlert("Footage exceeds remaining available");
 
     const s = Math.min(Number(outer), Number(inner));
     const e = Math.max(Number(outer), Number(inner));
@@ -133,7 +135,30 @@ export default function ProductCard({
   return (
     <div className={`rounded-2xl p-4 border ${cardStateClasses}`}>
       <div className="flex-1">
-        <div className="font-semibold text-base md:text-lg">[{product.code}] {product.desc || "Unnamed"}</div>
+        <div className="flex items-start justify-between gap-3">
+          <div className="font-semibold text-base md:text-lg">[{product.code}] {product.desc || "Unnamed"}</div>
+          {isMiscProduct && onRemoveMisc && (
+            <button
+              type="button"
+              className={[
+                "flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide px-2 py-1 rounded-full border transition",
+                (!isMiscRemovable || locked)
+                  ? "border-gray-200 bg-white text-gray-400 cursor-not-allowed"
+                  : "border-red-200 bg-white text-red-600 hover:bg-red-50 hover:text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-red-500"
+              ].join(" ")}
+              onClick={(event) => {
+                event.stopPropagation();
+                if (!isMiscRemovable || locked) return;
+                onRemoveMisc();
+              }}
+              disabled={!isMiscRemovable || locked}
+              title={(!isMiscRemovable || locked) ? "Cannot remove this item once imported or locked" : "Remove this miscellaneous item"}
+            >
+              <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
+              <span>Remove</span>
+            </button>
+          )}
+        </div>
         <div className="text-sm text-gray-600 flex flex-wrap gap-3 mt-1">
           <span>Total: <b>{product.posted}</b></span>
           <span>Returned: <b>{product.returned}</b></span>
@@ -143,6 +168,11 @@ export default function ProductCard({
           {product.isCable && <Badge>Cable (auto-detected)</Badge>}
           {netAllocated > totalAvailable && <span className="text-red-600 font-medium">Over-allocated — adjust allocations</span>}
         </div>
+        {isMiscProduct && (
+          <div className="text-xs text-gray-500 mt-1 leading-snug">
+            {MISC_PRODUCT_NOTE}
+          </div>
+        )}
         <div className="flex flex-wrap gap-2 mt-2 text-xs">
           <span
             className="px-2 py-1 rounded-full border border-yellow-200 bg-yellow-50 text-yellow-700"

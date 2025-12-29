@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { MISC_PRODUCT_CODE, isMiscProductCode } from "../lib/data";
 import { uid } from "../lib/uid";
 
 export function useAllocations(grouped) {
@@ -11,6 +12,7 @@ export function useAllocations(grouped) {
     const base = grouped.get(wo)?.get(code);
     const k = keyOf(wo, code);
     const extra = allocState[k] || { allocations: [], assets: {}, reels: {}, coe: {}, locked: false, cableMode: false };
+    const isMisc = isMiscProductCode(code);
     const posted = base?.posted || 0;
     const returned = base?.returned || 0;
     const totalAvailable = Math.max(posted - returned, 0);
@@ -52,18 +54,22 @@ export function useAllocations(grouped) {
     const pendingReturnSum = totals.pending;
     const netAllocated = allocatedSum - returnedSum;
     const remaining = Math.max(totalAvailable - netAllocated, 0);
+    const finalTotalAvailable = isMisc ? 0 : totalAvailable;
+    const finalRemaining = isMisc ? 0 : remaining;
+    const overAllocated = isMisc ? false : netAllocated > totalAvailable;
     return {
       base,
       extra,
-      totalAvailable,
+      totalAvailable: finalTotalAvailable,
       allocatedSum,
       pendingReturnSum,
       returnedSum,
       netAllocated,
-      remaining,
-      overAllocated: netAllocated > totalAvailable,
+      remaining: finalRemaining,
+      overAllocated,
       cableMode: extra.cableMode || false,
       cableSuggested: !!base?.isCable,
+      isMisc,
     };
   };
 
@@ -154,6 +160,7 @@ export function useAllocations(grouped) {
 
     // (1) over / unallocated
     for (const [code] of gm) {
+      if (isMiscProductCode(code)) continue;
       const s = getItemState(wo, code);
       if (s.netAllocated > s.totalAvailable) {
         issues.push(`Over-allocated on [${code}]: allocations (${s.netAllocated}) exceed available (${s.totalAvailable}).`);
@@ -165,6 +172,7 @@ export function useAllocations(grouped) {
 
     // (2) reel overlaps + span bounds per reel
     for (const [code] of gm) {
+      if (isMiscProductCode(code)) continue;
       const k = keyOf(wo, code);
       const rec = allocState[k] || { allocations: [], reels: {} };
       const byReel = {};
@@ -200,6 +208,7 @@ export function useAllocations(grouped) {
 
     // (3) asset IDs (and SCXR-only COE field validation)
     for (const [code] of gm) {
+      if (isMiscProductCode(code)) continue;
       const k = keyOf(wo, code);
       const state = allocState[k] || { allocations: [], assets: {} };
       // determine SCXR from grouped data

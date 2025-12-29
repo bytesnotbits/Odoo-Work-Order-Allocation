@@ -1,39 +1,106 @@
+import { useState } from "react";
 import Badge from "./Badge";
 import { AlertTriangle, CheckCircle2 } from "lucide-react";
 import ProductCard from "./ProductCard";
 import { naturalCompare } from "../lib/natural";
+import { isMiscProductCode, MISC_PRODUCT_CODE, MISC_PRODUCT_PREFIX } from "../lib/data";
 
 export default function WOView({
-  wo, grouped, getItemState, upsertAllocation, removeAllocation, setAssetId,
-  setAssetMeta, setReelSpan, removeReelSpan, getReelSpan, listReels, lockWorkOrder, tab, allocState, setCableMode
+  wo, grouped, baseGrouped, getItemState, upsertAllocation, removeAllocation,
+  setAssetMeta, setReelSpan, removeReelSpan, getReelSpan, listReels, lockWorkOrder, tab, allocState, setCableMode,
+  addMiscEntry, removeMiscEntry, nextMiscCode
 }) {
   const gm = grouped.get(wo) || new Map();
+  const [miscDescription, setMiscDescription] = useState("");
+  const [miscItemNumber, setMiscItemNumber] = useState("");
   const products = Array.from(gm.values()).sort((a, b) => naturalCompare(a.code, b.code));
+  const isMiscProduct = (product) => isMiscProductCode(product.code);
+  const productStates = products.map((product) => ({ product, state: getItemState(wo, product.code) }));
+  const allocatableStates = productStates.filter(({ product }) => !isMiscProduct(product));
+  const allAllocated = allocatableStates.every(({ state }) => state.remaining === 0);
+  const anyOverAllocated = allocatableStates.some(({ state }) => state.netAllocated > state.totalAvailable);
+  const anyUnallocated = allocatableStates.some(({ state }) => state.remaining > 0);
+  const allAsseted = productStates.every(({ product, state }) => {
+    if (isMiscProduct(product)) return true;
+    return state.extra.allocations.length === 0 || state.extra.allocations.every((a) => (allocState[`${wo}|${product.code}`]?.assets || {})[a.id]);
+  });
 
-  const allAllocated = products.every((p) => getItemState(wo, p.code).remaining === 0);
-  const allAsseted = products.every((p) => {
-    const s = getItemState(wo, p.code);
-    return s.extra.allocations.length === 0 || s.extra.allocations.every((a) => (allocState[`${wo}|${p.code}`]?.assets || {})[a.id]);
-  });
-  const anyOverAllocated = products.some((p) => {
-    const s = getItemState(wo, p.code);
-    return s.netAllocated > s.totalAvailable;
-  });
-  const anyUnallocated = products.some((p) => getItemState(wo, p.code).remaining > 0);
+  const safeAlert = (msg) => {
+    try {
+      if (typeof window !== "undefined" && typeof window.alert === "function") {
+        window.alert(msg);
+      }
+    } catch {
+      /* ignore in testing */
+    }
+  };
+
+  const handleAddMisc = () => {
+    if (!addMiscEntry) return;
+    const userEntered = (miscItemNumber || "").trim();
+    const codeToUse = userEntered || nextMiscCode;
+    if (!codeToUse) {
+      safeAlert("Enter an item number such as MISC-1 before submitting.");
+      return;
+    }
+    addMiscEntry(codeToUse, miscDescription.trim());
+    setMiscDescription("");
+    setMiscItemNumber("");
+  };
+
+  const baseProducts = baseGrouped?.get(wo) || new Map();
+  const isUserGeneratedMisc = (product) => (
+    isMiscProduct(product) &&
+    product.code !== MISC_PRODUCT_CODE &&
+    product.code.startsWith(MISC_PRODUCT_PREFIX)
+  );
 
   return (
     <div className="space-y-6">
       {products.length === 0 && (<div className="text-sm text-gray-600">No products for this work order.</div>)}
 
-      {products.map((p) => (
-        <ProductCard
+      <div className="space-y-2 rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
+        <div className="flex items-center justify-between">
+          <div className="font-medium text-slate-900">Add miscellaneous material</div>
+          <div className="text-xs text-slate-500">Provisional only</div>
+        </div>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <input
+            type="text"
+            placeholder={nextMiscCode ? `${nextMiscCode}` : "Item number (e.g., MISC-1)"}
+            className="border rounded-xl px-3 py-2 w-full sm:w-48"
+            value={miscItemNumber}
+            onChange={(e) => setMiscItemNumber(e.target.value)}
+          />
+          <input
+            type="text"
+            placeholder="Description (optional)"
+            className="flex-1 border rounded-xl px-3 py-2"
+            value={miscDescription}
+            onChange={(e) => setMiscDescription(e.target.value)}
+          />
+          <button
+            type="button"
+            className="whitespace-nowrap rounded-xl border border-slate-200 bg-slate-900 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white shadow-sm transition hover:bg-slate-800"
+            onClick={handleAddMisc}
+          >
+            Add item
+          </button>
+        </div>
+      </div>
+
+      {products.map((p) => {
+        const isImported = baseProducts.has(p.code);
+        const removableMisc = isUserGeneratedMisc(p) && !isImported;
+        const canRemoveMisc = removableMisc && typeof removeMiscEntry === "function";
+        return (
+          <ProductCard
           key={p.code}
           wo={wo}
           product={p}
           getItemState={getItemState}
           upsertAllocation={upsertAllocation}
           removeAllocation={removeAllocation}
-          setAssetId={setAssetId}
           setAssetMeta={setAssetMeta}
           setReelSpan={setReelSpan}
           removeReelSpan={removeReelSpan}
@@ -42,8 +109,10 @@ export default function WOView({
           setCableMode={setCableMode}
           tab={tab}
           locked={(allocState[`${wo}|${p.code}`]?.locked) || false}
+          isMiscRemovable={removableMisc}
+          onRemoveMisc={canRemoveMisc ? () => removeMiscEntry?.(p.code) : undefined}
         />
-      ))}
+      )})}
 
       <div className="flex items-center gap-3 pt-2 border-t">
         {(anyOverAllocated || anyUnallocated) && (

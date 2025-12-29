@@ -6,7 +6,7 @@ import Section from "./components/Section";
 import Badge from "./components/Badge";
 import WOView from "./components/WOView";
 
-import { demoRows } from "./lib/data";
+import { demoRows, MISC_PRODUCT_CODE, MISC_PRODUCT_DESC, MISC_PRODUCT_PREFIX } from "./lib/data";
 import { normalizeRow, groupRows } from "./lib/rows";
 import { exportAllocationsToXLSX } from "./lib/xlsxExport";
 import { useAllocations } from "./hooks/useAllocations";
@@ -18,16 +18,95 @@ export default function App() {
   const [selectedWO, setSelectedWO] = useState("");
   const [tab, setTab] = useState("engineering"); // "engineering" | "accounting"
 
+  const [miscEntries, setMiscEntries] = useState({});
   const rows = useMemo(() => rawRows.map(normalizeRow), [rawRows]);
   const grouped = useMemo(() => groupRows(rows), [rows]);
+  const groupedWithMisc = useMemo(() => {
+    const map = new Map();
+    for (const [wo, gm] of grouped.entries()) {
+      const clone = new Map(gm);
+      const extras = miscEntries[wo] || [];
+      extras.forEach(({ code, desc }) => {
+        if (!clone.has(code)) {
+          clone.set(code, {
+            code,
+            desc: desc || `${MISC_PRODUCT_DESC} (${code})`,
+            posted: 0,
+            returned: 0,
+            isCable: false,
+            group: "",
+          });
+        }
+      });
+      map.set(wo, clone);
+    }
+    return map;
+  }, [grouped, miscEntries]);
+
+  const normalizeMiscItemNumber = (raw) => {
+    if (!raw) return "";
+    const candidate = String(raw).trim().toUpperCase();
+    if (!candidate) return "";
+    if (candidate.startsWith(MISC_PRODUCT_PREFIX)) return candidate;
+    return `${MISC_PRODUCT_PREFIX}${candidate}`;
+  };
+
+  const safeAlert = (msg) => {
+    try {
+      if (typeof window !== "undefined" && typeof window.alert === "function") {
+        window.alert(msg);
+      }
+    } catch {
+      /* no-op in test or unsupported environments */
+    }
+  };
+
+  const registerMiscEntry = (wo, itemNumber, description) => {
+    if (!wo) return;
+    const code = normalizeMiscItemNumber(itemNumber);
+    if (!code) {
+      safeAlert("Enter an item number such as MISC-1 before adding miscellaneous material.");
+      return;
+    }
+    setMiscEntries((prev) => {
+      const existing = prev[wo] || [];
+      if (existing.some((entry) => entry.code === code)) {
+        safeAlert(`${code} already exists on WO ${wo}.`);
+        return prev;
+      }
+      const label = (description?.trim()) || `${MISC_PRODUCT_DESC} (${code})`;
+      return {
+        ...prev,
+        [wo]: [...existing, { code, desc: label }],
+      };
+    });
+  };
+
+  const removeMiscEntry = (wo, rawCode) => {
+    if (!wo) return;
+    const code = normalizeMiscItemNumber(rawCode);
+    if (!code) return;
+    setMiscEntries((prev) => {
+      const existing = prev[wo] || [];
+      const updated = existing.filter((entry) => entry.code !== code);
+      if (updated.length === existing.length) return prev;
+      if (updated.length === 0) {
+        const { [wo]: _, ...rest } = prev;
+        return rest;
+      }
+      return { ...prev, [wo]: updated };
+    });
+  };
 
   const {
     allocState, keyOf, getItemState, upsertAllocation, removeAllocation,
-    setAssetId, setAssetMeta, setReelSpan, removeReelSpan, getReelSpan, listReels, lockWorkOrder, setCableMode
-  } = useAllocations(grouped);
+    setAssetMeta, setReelSpan, removeReelSpan, getReelSpan, listReels, lockWorkOrder, setCableMode
+  } = useAllocations(groupedWithMisc);
 
   const workOrders = useMemo(() => Array.from(grouped.keys()).sort(naturalCompare), [grouped]);
   const activeWO = selectedWO || workOrders[0] || "";
+  const miscEntriesForActive = miscEntries[activeWO] || [];
+  const nextMiscCode = `${MISC_PRODUCT_PREFIX}${miscEntriesForActive.length + 1}`;
   
 
   async function handleFile(e) {
@@ -37,6 +116,7 @@ export default function App() {
       const json = await readFirstSheet(file);
       setRawRows(json);
       setSelectedWO("");
+      setMiscEntries({});
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error("Failed to read file", err);
@@ -46,7 +126,7 @@ export default function App() {
   function exportAllocations() {
     exportAllocationsToXLSX({
       workOrders,
-      grouped,
+      grouped: groupedWithMisc,
       getItemState,
       keyOf,
       allocState,
@@ -139,22 +219,25 @@ export default function App() {
         {activeWO ? (
           <>
             <Section title={`Materials for WO ${activeWO}`} icon={Split}>
-            <WOView
-              wo={activeWO}
-              grouped={grouped}
-              getItemState={getItemState}
-              upsertAllocation={upsertAllocation}
-              removeAllocation={removeAllocation}
-              setAssetId={setAssetId}
-              setAssetMeta={setAssetMeta}
-              setReelSpan={setReelSpan}
-              removeReelSpan={removeReelSpan}
-              getReelSpan={getReelSpan}
-              listReels={listReels}
-              lockWorkOrder={lockWorkOrder}
-              setCableMode={setCableMode}
+              <WOView
+                wo={activeWO}
+                grouped={groupedWithMisc}
+                baseGrouped={grouped}
+                getItemState={getItemState}
+                upsertAllocation={upsertAllocation}
+                removeAllocation={removeAllocation}
+                setAssetMeta={setAssetMeta}
+                setReelSpan={setReelSpan}
+                removeReelSpan={removeReelSpan}
+                getReelSpan={getReelSpan}
+                listReels={listReels}
+                lockWorkOrder={lockWorkOrder}
+                setCableMode={setCableMode}
                 tab={tab}
                 allocState={allocState}
+                addMiscEntry={(itemNumber, description) => registerMiscEntry(activeWO, itemNumber, description)} // ensures function bound to current work order
+                removeMiscEntry={(code) => removeMiscEntry(activeWO, code)}
+                nextMiscCode={nextMiscCode}
               />
             </Section>
 
