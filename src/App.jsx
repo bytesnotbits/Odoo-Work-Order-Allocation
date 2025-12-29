@@ -23,7 +23,7 @@ export default function App() {
 
   const {
     allocState, keyOf, getItemState, upsertAllocation, removeAllocation,
-    setAssetId, setAssetMeta, setReelSpan, getReelSpan, listReels, lockWorkOrder, setCableMode
+    setAssetId, setAssetMeta, setReelSpan, removeReelSpan, getReelSpan, listReels, lockWorkOrder, setCableMode
   } = useAllocations(grouped);
 
   const workOrders = useMemo(() => Array.from(grouped.keys()).sort(naturalCompare), [grouped]);
@@ -139,19 +139,20 @@ export default function App() {
         {activeWO ? (
           <>
             <Section title={`Materials for WO ${activeWO}`} icon={Split}>
-              <WOView
-                wo={activeWO}
-                grouped={grouped}
-                getItemState={getItemState}
-                upsertAllocation={upsertAllocation}
-                removeAllocation={removeAllocation}
-                setAssetId={setAssetId}
-                setAssetMeta={setAssetMeta}
-                setReelSpan={setReelSpan}
-                getReelSpan={getReelSpan}
-                listReels={listReels}
-                lockWorkOrder={lockWorkOrder}
-                setCableMode={setCableMode}
+            <WOView
+              wo={activeWO}
+              grouped={grouped}
+              getItemState={getItemState}
+              upsertAllocation={upsertAllocation}
+              removeAllocation={removeAllocation}
+              setAssetId={setAssetId}
+              setAssetMeta={setAssetMeta}
+              setReelSpan={setReelSpan}
+              removeReelSpan={removeReelSpan}
+              getReelSpan={getReelSpan}
+              listReels={listReels}
+              lockWorkOrder={lockWorkOrder}
+              setCableMode={setCableMode}
                 tab={tab}
                 allocState={allocState}
               />

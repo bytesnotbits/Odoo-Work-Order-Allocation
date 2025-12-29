@@ -118,6 +118,14 @@ export function useAllocations(grouped) {
       return { ...prev, [k]: { ...cur, reels: { ...(cur.reels || {}), [reelSerial]: { start, end } } } };
     });
   };
+  const removeReelSpan = (wo, code, reelSerial) => {
+    setAllocState(prev => {
+      const k = keyOf(wo, code);
+      const cur = prev[k] || { allocations: [], assets: {}, locked: false, reels: {}, cableMode: false };
+      const { [reelSerial]: _, ...remaining } = cur.reels || {};
+      return { ...prev, [k]: { ...cur, reels: remaining } };
+    });
+  };
   const getReelSpan = (wo, code, reelSerial) => {
     const k = keyOf(wo, code);
     const rec = allocState[k] || {};
@@ -244,6 +252,7 @@ export function useAllocations(grouped) {
     setAssetId,
     setAssetMeta,
     setReelSpan,
+    removeReelSpan,
     getReelSpan,
     listReels,
     lockWorkOrder,

@@ -6,12 +6,13 @@ import { Plus, Trash2, Ruler } from "lucide-react";
 export default function ProductCard({
   wo, product, getItemState,
   upsertAllocation, removeAllocation, setAssetId, setAssetMeta,
-  setReelSpan, getReelSpan, listReels, setCableMode, tab, locked
+  setReelSpan, removeReelSpan, getReelSpan, listReels, setCableMode, tab, locked
 }) {
   // Avoid throwing in test environment where window.alert is "not implemented"
   const safeAlert = (msg) => {
     try { if (typeof window !== 'undefined' && typeof window.alert === 'function') window.alert(msg) } catch { /* no-op in tests */ }
   };
+  const formatSpanInput = (value) => (value === "" || value === undefined || value === null) ? "" : String(value);
   const {
     base, extra, totalAvailable, allocatedSum,
     pendingReturnSum, returnedSum, netAllocated, remaining,
@@ -30,11 +31,40 @@ export default function ProductCard({
   if (!base) return null;
 
   const reelFootage = Math.abs((Number(inner) || 0) - (Number(outer) || 0));
+  const knownReels = listReels(wo, product.code);
   const currentSpan = reelSerial ? getReelSpan(wo, product.code, reelSerial) : { start: "", end: "" };
   const spanStartNum = isFinite(Number(currentSpan.start)) ? Number(currentSpan.start) : null;
   const spanEndNum = isFinite(Number(currentSpan.end)) ? Number(currentSpan.end) : null;
   const spanMin = spanStartNum !== null && spanEndNum !== null ? Math.min(spanStartNum, spanEndNum) : null;
   const spanMax = spanStartNum !== null && spanEndNum !== null ? Math.max(spanStartNum, spanEndNum) : null;
+  const handleSelectReel = (serial) => {
+    const span = getReelSpan(wo, product.code, serial);
+    setReelSerial(serial);
+    setSpanStartInput(formatSpanInput(span?.start));
+    setSpanEndInput(formatSpanInput(span?.end));
+  };
+  const handleRemoveReel = (serial) => {
+    removeReelSpan(wo, product.code, serial);
+    if (serial === reelSerial) {
+      setReelSerial("");
+      setSpanStartInput("");
+      setSpanEndInput("");
+    }
+  };
+  const reelSpanSummaries = knownReels.map((serial) => {
+    const span = getReelSpan(wo, product.code, serial);
+    const s = Number(span?.start);
+    const e = Number(span?.end);
+    if (!isFinite(s) || !isFinite(e)) {
+      return { serial, hasSpan: false };
+    }
+    const total = Math.abs(e - s);
+    const covered = extra.allocations
+      .filter(a => a.type === "reel" && (a.reelSerial || "") === serial && a.outer != null && a.inner != null)
+      .reduce((sum, a) => sum + Math.abs(a.outer - a.inner), 0);
+    const remainingSpan = Math.max(total - covered, 0);
+    return { serial, hasSpan: true, total, covered, remainingSpan };
+  });
   const primaryButton = [
     "inline-flex items-center gap-2 px-3 py-2 rounded-xl border transition font-semibold shadow-sm",
     "bg-blue-600 text-white border-blue-600",
@@ -202,8 +232,39 @@ export default function ProductCard({
                     <div>
                       <label className="block text-sm">Reel/Serial Number</label>
                       <input className="w-full border rounded-xl p-2" value={reelSerial} onChange={(e)=> setReelSerial(e.target.value)} placeholder="REEL-XXXXX" />
-                      {listReels(wo, product.code).length > 0 && (
-                        <div className="text-xs text-gray-600 mt-1">Known reels: {listReels(wo, product.code).join(", ")}</div>
+                      {knownReels.length > 0 && (
+                        <div className="text-xs text-gray-600 mt-1">
+                          <div className="text-[11px] uppercase tracking-wide mb-1 text-slate-500">Known reels</div>
+                          <div className="flex flex-wrap gap-2">
+                            {knownReels.map((serial) => (
+                              <div key={serial} className="flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  className={[
+                                    "px-2 py-1 rounded-full border text-[11px] transition",
+                                    serial === reelSerial
+                                      ? "bg-slate-900 text-white border-slate-900"
+                                      : "bg-white text-slate-900 border-slate-200 hover:bg-slate-50"
+                                  ].join(" ")}
+                                  onClick={() => handleSelectReel(serial)}
+                                >
+                                  {serial}
+                                </button>
+                                <button
+                                  type="button"
+                                  className="flex items-center justify-center w-5 h-5 rounded-full border border-red-200 text-red-600 text-[10px] bg-white hover:bg-red-50"
+                                  aria-label={`Remove reel ${serial}`}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleRemoveReel(serial);
+                                  }}
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
                       )}
                     </div>
                     <div>
@@ -224,20 +285,26 @@ export default function ProductCard({
                     }} className={primaryButton + " px-3 py-1"}>Save span</button>
                   </div>
                   {/* Coverage summary */}
-                  {(() => {
-                    if (!reelSerial) return null;
-                    const rs = getReelSpan(wo, product.code, reelSerial);
-                    const s = Number(rs?.start), e = Number(rs?.end);
-                    if (isFinite(s) && isFinite(e)) {
-                      const total = Math.abs(e - s);
-                      const covered = extra.allocations
-                        .filter(a => a.type === "reel" && (a.reelSerial || "") === reelSerial && a.outer != null && a.inner != null)
-                        .reduce((sum, a) => sum + Math.abs(a.outer - a.inner), 0);
-                      const remainingSpan = Math.max(total - covered, 0);
-                      return <div className="text-sm text-gray-600 mt-2">[{reelSerial}] Span total: <b>{total}</b> | Covered: <b>{covered}</b> | Remaining: <b>{remainingSpan}</b></div>;
-                    }
-                    return <div className="text-sm text-gray-500 mt-2">No span saved for this reel yet.</div>;
-                  })()}
+                  {knownReels.length === 0 ? (
+                    <div className="text-sm text-gray-500 mt-2">No spans saved for this product yet.</div>
+                  ) : (
+                    <div className="space-y-1 text-sm mt-2">
+                      {reelSpanSummaries.map(({ serial, hasSpan, total, covered, remainingSpan }) => (
+                        hasSpan ? (
+                          <div
+                            key={serial}
+                            className={`text-gray-600 ${serial === reelSerial ? "text-gray-800 font-semibold" : ""}`}
+                          >
+                            [{serial}] Span total: <b>{total}</b> | Covered: <b>{covered}</b> | Remaining: <b>{remainingSpan}</b>
+                          </div>
+                        ) : (
+                          <div key={serial} className="text-gray-500">
+                            [{serial}] No span saved for this reel yet.
+                          </div>
+                        )
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Reel piece */}
