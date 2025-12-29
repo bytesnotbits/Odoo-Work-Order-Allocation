@@ -309,10 +309,20 @@ export default function ProductCard({
 
                 {/* Reel piece */}
                 <div className="flex items-center gap-2"><Ruler className="w-4 h-4" /> <div className="font-medium">Reel piece</div></div>
-                <label className="block text-sm">Inner Seq</label>
-                <input type="number" className="w-full border rounded-xl p-2" value={inner} onChange={(e) => setInner(e.target.value)} />
-                <label className="block text-sm">Outer Seq</label>
-                <input type="number" className="w-full border rounded-xl p-2" value={outer} onChange={(e) => setOuter(e.target.value)} />
+                <div className="grid md:grid-cols-3 gap-2">
+                  <div>
+                    <label className="block text-sm">Reel/Serial Number <span className="text-red-500">*</span></label>
+                    <input className="w-full border rounded-xl p-2" value={reelSerial} onChange={(e) => setReelSerial(e.target.value)} placeholder="REEL-XXXXX" />
+                  </div>
+                  <div>
+                    <label className="block text-sm">Inner Seq</label>
+                    <input type="number" className="w-full border rounded-xl p-2" value={inner} onChange={(e) => setInner(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="block text-sm">Outer Seq</label>
+                    <input type="number" className="w-full border rounded-xl p-2" value={outer} onChange={(e) => setOuter(e.target.value)} />
+                  </div>
+                </div>
                 <div className="text-sm text-gray-600">Footage = |Inner − Outer| → <b>{reelFootage}</b></div>
                 <label className="block text-sm">Allocation notes (optional)</label>
                 <input className="w-full border rounded-xl p-2" value={allocId} onChange={(e) => setAllocId(e.target.value)} placeholder="e.g., AERIAL-SPAN-12" />
@@ -326,8 +336,6 @@ export default function ProductCard({
                     <input className="flex-1 border rounded-xl p-2" placeholder="Enter custom category" value={allocCategoryCustom} onChange={(e) => setAllocCategoryCustom(e.target.value)} />
                   )}
                 </div>
-                <label className="block text-sm mt-2">Reel/Serial Number <span className="text-red-500">*</span></label>
-                <input className="w-full border rounded-xl p-2" value={reelSerial} onChange={(e) => setReelSerial(e.target.value)} placeholder="REEL-XXXXX" />
                 <button disabled={locked} onClick={addReelPiece} className={primaryButton}><Plus className="w-4 h-4" /> Add piece</button>
               </div>
             )}
