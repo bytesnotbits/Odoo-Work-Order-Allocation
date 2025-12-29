@@ -19,6 +19,7 @@ export default function App() {
   const [tab, setTab] = useState("engineering"); // "engineering" | "accounting"
 
   const [miscEntries, setMiscEntries] = useState({});
+  const [workOrderNotes, setWorkOrderNotes] = useState({});
   const rows = useMemo(() => rawRows.map(normalizeRow), [rawRows]);
   const grouped = useMemo(() => groupRows(rows), [rows]);
   const groupedWithMisc = useMemo(() => {
@@ -98,6 +99,17 @@ export default function App() {
     });
   };
 
+  const updateWorkOrderNote = (wo, note) => {
+    if (!wo) return;
+    setWorkOrderNotes((prev) => {
+      if (!note) {
+        const { [wo]: _, ...rest } = prev;
+        return rest;
+      }
+      return { ...prev, [wo]: note };
+    });
+  };
+
   const {
     allocState, keyOf, getItemState, upsertAllocation, removeAllocation,
     setAssetMeta, setReelSpan, removeReelSpan, getReelSpan, listReels, lockWorkOrder, setCableMode
@@ -107,6 +119,7 @@ export default function App() {
   const activeWO = selectedWO || workOrders[0] || "";
   const miscEntriesForActive = miscEntries[activeWO] || [];
   const nextMiscCode = `${MISC_PRODUCT_PREFIX}${miscEntriesForActive.length + 1}`;
+  const noteForActive = workOrderNotes[activeWO] || "";
   
 
   async function handleFile(e) {
@@ -117,6 +130,7 @@ export default function App() {
       setRawRows(json);
       setSelectedWO("");
       setMiscEntries({});
+      setWorkOrderNotes({});
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error("Failed to read file", err);
@@ -238,6 +252,8 @@ export default function App() {
                 addMiscEntry={(itemNumber, description) => registerMiscEntry(activeWO, itemNumber, description)} // ensures function bound to current work order
                 removeMiscEntry={(code) => removeMiscEntry(activeWO, code)}
                 nextMiscCode={nextMiscCode}
+                workOrderNote={noteForActive}
+                onWorkOrderNoteChange={(note) => updateWorkOrderNote(activeWO, note)}
               />
             </Section>
 
