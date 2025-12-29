@@ -75,11 +75,30 @@ export default function ProductCard({
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500",
     "disabled:bg-blue-200 disabled:border-blue-200 disabled:text-white disabled:cursor-not-allowed",
   ].join(" ");
+  const secondaryButton = [
+    "inline-flex items-center gap-2 px-3 py-2 rounded-xl border transition font-semibold shadow-sm",
+    "bg-white text-slate-900 border-slate-200",
+    "hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-slate-900",
+    "disabled:opacity-50 disabled:cursor-not-allowed",
+  ].join(" ");
 
   const finalCategory = () =>
     allocCategory === "__custom__" ? (allocCategoryCustom || "Custom") : allocCategory;
   const isCustomCategory = () => allocCategory === "__custom__";
   const isReturnCategory = (category) => ["Returned", "Pending"].includes(category);
+  const buildRegularPayload = (qty, categoryName) => ({
+    type: "regular",
+    qty,
+    allocationId: allocId || "",
+    allocationCategory: categoryName,
+    allocationCategoryIsCustom: isCustomCategory(),
+    reelSerial,
+  });
+  const isEditingRegular = Boolean(
+    selectedAllocation?.id &&
+      selectedAllocation.type !== "reel" &&
+      typeof updateAllocation === "function"
+  );
 
   function addRegular() {
     const qty = Number(allocQty);
@@ -87,14 +106,7 @@ export default function ProductCard({
     const categoryName = finalCategory();
     const isReturn = isReturnCategory(categoryName);
     if (!isReturn && !isMiscProduct && qty > remaining) return safeAlert("Quantity exceeds remaining available");
-    const payload = {
-      type: "regular",
-      qty,
-      allocationId: allocId || "",
-      allocationCategory: categoryName,
-      allocationCategoryIsCustom: isCustomCategory(),
-      reelSerial,
-    };
+    const payload = buildRegularPayload(qty, categoryName);
     if (selectedAllocation?.id && selectedAllocation.type !== "reel" && typeof updateAllocation === "function") {
       updateAllocation(wo, product.code, selectedAllocation.id, payload);
     } else {
@@ -106,6 +118,21 @@ export default function ProductCard({
     setAllocCategory(ALLOCATION_OPTIONS[0]);
     setAllocCategoryCustom("");
     setSelectedAllocation(null);
+  }
+
+  function handleUpdateRegular() {
+    if (!isEditingRegular) return;
+    const qty = Number(allocQty);
+    if (!qty || qty <= 0) return safeAlert("Enter a positive quantity");
+    const categoryName = finalCategory();
+    const isReturn = isReturnCategory(categoryName);
+    const existingQty = Number(selectedAllocation?.qty ?? 0);
+    const availableForUpdate = remaining + existingQty;
+    if (!isReturn && !isMiscProduct && qty > availableForUpdate) {
+      return safeAlert("Quantity exceeds remaining available");
+    }
+    const payload = buildRegularPayload(qty, categoryName);
+    updateAllocation(wo, product.code, selectedAllocation.id, payload);
   }
 
   function addReelPiece() {
@@ -310,15 +337,26 @@ export default function ProductCard({
                 </div>
                 <label className="block text-sm mt-2">Reel/Serial Number (optional)</label>
                 <input className="w-full border rounded-xl p-2" value={reelSerial} onChange={(e) => setReelSerial(e.target.value)} placeholder="e.g., REEL-12345 or SN-0001" />
-                <button
-                  type="button"
-                  onClick={addRegular}
-                  className={primaryButton}
-                  aria-label="Add Asset"
-                >
-                  <Plus className="w-4 h-4" aria-hidden="true" />
-                  <span className="font-medium">Add Asset</span>
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={addRegular}
+                    className={primaryButton}
+                    aria-label="Add Asset"
+                  >
+                    <Plus className="w-4 h-4" aria-hidden="true" />
+                    <span className="font-medium">Add Asset</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleUpdateRegular}
+                    className={secondaryButton}
+                    disabled={!isEditingRegular}
+                    aria-label="Update selected asset"
+                  >
+                    Update existing
+                  </button>
+                </div>
               </div>
             )}
 
