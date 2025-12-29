@@ -371,111 +371,127 @@ export default function ProductCard({
             )}
           </div>
 
-          {/* RIGHT: Allocations table (engineering can also capture asset meta) */}
-          <div className="bg-gray-50 rounded-xl p-3 border overflow-x-auto">
-              <div className="font-medium mb-2">Allocations</div>
-            <div data-testid="allocations-scroll" className="-mx-2 sm:mx-0 overflow-x-auto">
-              <table className="min-w-[960px] sm:min-w-full table-fixed text-sm">
-                <thead className="sticky top-0 bg-white">
-                  <tr className="[&>th]:px-2 [&>th]:py-1 [&>th]:text-left [&>th]:font-medium [&>th]:whitespace-nowrap text-gray-600">
-                    <th className="w-16">Type</th>
-                    <th className="w-24">Qty/Footage</th>
-                    <th className="w-20">Outer</th>
-                    <th className="w-20">Inner</th>
-                    <th className="min-w-[160px]">Allocation Notes</th>
-                    <th className="min-w-[140px]">Category</th>
-                    <th className="min-w-[140px]">Reel/Serial</th>
-                    <th className="min-w-[140px]">Asset ID</th>
-                    <th className="min-w-[120px]">COE LOC</th>
-                    <th className="min-w-[120px]">RACK/BAY</th>
-                    <th className="min-w-[100px]">SEPCAT</th>
-                    <th className="w-14 text-right">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="[&>tr>td]:px-2 [&>tr>td]:py-1">
-                  {extra.allocations.length === 0 ? (
-                    <tr><td colSpan={12} className="text-sm text-gray-600 py-3">No allocations yet.</td></tr>
-                  ) : (
-                    extra.allocations.map(a => {
-                      const isPendingReturn = a.allocationCategory === "Pending return";
-                      const raw = (extra.assets && extra.assets[a.id]) || {};
-                      const m = typeof raw === 'object'
-                        ? raw
-                        : { assetId: raw ?? '', coeLoc: '', rackBay: '', sepcat: '' };
-                      return (
-                      <tr key={a.id} className={`border-t ${isPendingReturn ? "bg-yellow-50 text-yellow-700" : ""}`}>
-                        <td className="whitespace-nowrap">{a.type}</td>
-                        <td className="whitespace-nowrap">{a.type === 'reel' ? a.footage : a.qty}</td>
-                        <td className="whitespace-nowrap">{a.type === 'reel' ? a.outer : ''}</td>
-                        <td className="whitespace-nowrap">{a.type === 'reel' ? a.inner : ''}</td>
-                        <td title={a.allocationId || ''} className="truncate max-w-[240px]">{a.allocationId || ''}</td>
-                        <td className="whitespace-nowrap">{a.allocationCategory || ''}</td>
-                        <td className="whitespace-nowrap">{a.reelSerial || ''}</td>
-                        <td className="py-1">
+          {/* RIGHT: Allocations (engineering can also capture asset meta) */}
+          <div className="bg-gray-50 rounded-xl p-3 border">
+            <div className="font-medium mb-2">Allocations</div>
+            {extra.allocations.length === 0 ? (
+              <div className="text-sm text-gray-600 py-3">No allocations yet.</div>
+            ) : (
+              <div className="space-y-3">
+                {extra.allocations.map((a) => {
+                  const isPendingReturn = a.allocationCategory === "Pending return";
+                  const raw = (extra.assets && extra.assets[a.id]) || {};
+                  const meta = typeof raw === "object"
+                    ? raw
+                    : { assetId: raw ?? "", coeLoc: "", rackBay: "", sepcat: "" };
+                  const numericValue = a.type === "reel" ? a.footage : a.qty;
+                  const outerValue = a.type === "reel" ? (a.outer ?? "—") : "—";
+                  const innerValue = a.type === "reel" ? (a.inner ?? "—") : "—";
+                  const chipBase = "px-2 py-1 rounded-full border text-[11px] font-semibold uppercase tracking-wide";
+                  const chipColor = isPendingReturn
+                    ? "border-yellow-200 bg-yellow-50 text-yellow-700"
+                    : "border-slate-200 bg-white text-slate-600";
+                  const cardColor = isPendingReturn
+                    ? "border-yellow-200 bg-yellow-50 text-yellow-800"
+                    : "border-slate-200 bg-white text-slate-900";
+                  const inputBase = "w-full border rounded-lg px-2 py-1 text-sm";
+                  return (
+                    <div key={a.id} className={`rounded-2xl border p-3 shadow-sm ${cardColor}`}>
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <div className="text-sm font-semibold">
+                          {a.type === "reel" ? "Reel piece" : "Quantity allocation"}
+                        </div>
+                        <button
+                          type="button"
+                          className="inline-flex items-center justify-center px-2 py-1 rounded border text-sm"
+                          onClick={() => removeAllocation(wo, product.code, a.id)}
+                          aria-label="Remove allocation"
+                          disabled={locked}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                      <div className="flex flex-wrap gap-2 mt-2 text-[11px]">
+                        <span className={`${chipBase} ${chipColor}`}>
+                          Qty/Footage: <b className="text-xs uppercase">{numericValue ?? 0}</b>
+                        </span>
+                        <span className={`${chipBase} ${chipColor}`}>
+                          Outer: <b>{outerValue}</b>
+                        </span>
+                        <span className={`${chipBase} ${chipColor}`}>
+                          Inner: <b>{innerValue}</b>
+                        </span>
+                        <span className={`${chipBase} ${chipColor}`}>
+                          Reel/Serial: <b>{a.reelSerial || "—"}</b>
+                        </span>
+                        <span className={`${chipBase} ${chipColor}`}>
+                          Category: <b>{a.allocationCategory || "Uncategorized"}</b>
+                        </span>
+                        {a.allocationId && (
+                          <span className={`${chipBase} ${chipColor}`}>
+                            Notes: <b>{a.allocationId}</b>
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                        <div>
+                          <div className="text-xs font-medium text-slate-500 uppercase tracking-wide">Asset ID</div>
                           {isPendingReturn ? (
-                            <span className="text-xs text-gray-500 uppercase tracking-wide">Info only</span>
+                            <div className="text-xs text-yellow-700 uppercase tracking-wide">Info only</div>
                           ) : (
                             <input
-                              className="border rounded-lg p-1 w-40"
+                              className={inputBase}
                               placeholder="Asset ID"
-                              value={m.assetId || ''}
+                              value={meta.assetId || ""}
                               onChange={(e) => setAssetMeta(wo, product.code, a.id, { assetId: e.target.value })}
                             />
                           )}
-                        </td>
-                        <td className="py-1">
+                        </div>
+                        <div>
+                          <div className="text-xs font-medium text-slate-500 uppercase tracking-wide">COE LOC</div>
                           {isPendingReturn ? (
-                            <span className="text-xs text-gray-500 uppercase tracking-wide">Info only</span>
+                            <div className="text-xs text-yellow-700 uppercase tracking-wide">Info only</div>
                           ) : (
                             <input
-                              className="border rounded-lg p-1 w-32"
+                              className={inputBase}
                               placeholder="COE LOC"
-                              value={m.coeLoc || ''}
+                              value={meta.coeLoc || ""}
                               onChange={(e) => setAssetMeta(wo, product.code, a.id, { coeLoc: e.target.value })}
                             />
                           )}
-                        </td>
-                        <td className="py-1">
+                        </div>
+                        <div>
+                          <div className="text-xs font-medium text-slate-500 uppercase tracking-wide">Rack/Bay</div>
                           {isPendingReturn ? (
-                            <span className="text-xs text-gray-500 uppercase tracking-wide">Info only</span>
+                            <div className="text-xs text-yellow-700 uppercase tracking-wide">Info only</div>
                           ) : (
                             <input
-                              className="border rounded-lg p-1 w-32"
+                              className={inputBase}
                               placeholder="RACK/BAY"
-                              value={m.rackBay || ''}
+                              value={meta.rackBay || ""}
                               onChange={(e) => setAssetMeta(wo, product.code, a.id, { rackBay: e.target.value })}
                             />
                           )}
-                        </td>
-                        <td className="py-1">
+                        </div>
+                        <div>
+                          <div className="text-xs font-medium text-slate-500 uppercase tracking-wide">SEPCAT</div>
                           {isPendingReturn ? (
-                            <span className="text-xs text-gray-500 uppercase tracking-wide">Info only</span>
+                            <div className="text-xs text-yellow-700 uppercase tracking-wide">Info only</div>
                           ) : (
                             <input
-                              className="border rounded-lg p-1 w-28"
+                              className={inputBase}
                               placeholder="SEPCAT"
-                              value={m.sepcat || ''}
+                              value={meta.sepcat || ""}
                               onChange={(e) => setAssetMeta(wo, product.code, a.id, { sepcat: e.target.value })}
                             />
                           )}
-                        </td>
-                        <td className="text-right">
-                          <button
-                            type="button"
-                            className="inline-flex px-2 py-1 rounded border"
-                            onClick={() => removeAllocation(wo, product.code, a.id)}
-                            aria-label="Remove allocation"
-                            disabled={locked}
-                          >
-                            ✕
-                          </button>
-                        </td>
-                      </tr>
-                    )})
-                  )}
-                </tbody>
-              </table>
-            </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       )}
