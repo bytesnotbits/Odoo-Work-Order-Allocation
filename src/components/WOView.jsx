@@ -103,7 +103,7 @@ export default function WOView({
       <div className="space-y-2 rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4">
         <div className="text-sm font-semibold text-slate-900">Work order notes</div>
         <textarea
-          placeholder="Log install status, returns, or follow-ups for the work order."
+          placeholder="Log misc install status, returns, or follow-ups for the work order."
           className="w-full border rounded-2xl px-3 py-2 min-h-[80px] text-sm leading-relaxed"
           value={noteValue}
           onChange={(e) => handleNoteChange(e.target.value)}

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { FileUp, Package2, Split, Download } from "lucide-react";
 
@@ -11,12 +11,15 @@ import { normalizeRow, groupRows } from "./lib/rows";
 import { exportAllocationsToXLSX } from "./lib/xlsxExport";
 import { useAllocations } from "./hooks/useAllocations";
 import { readFirstSheet } from "./utils/xlsxIO";
+import { buildStatePayload, downloadStateJson, readStateJson } from "./utils/stateIO";
 import { naturalCompare } from "./lib/natural";
 
 export default function App() {
   const [rawRows, setRawRows] = useState(demoRows);
   const [selectedWO, setSelectedWO] = useState("");
   const [tab, setTab] = useState("engineering"); // "engineering" | "accounting"
+  const stateInputRef = useRef(null);
+  const csvInputRef = useRef(null);
 
   const [miscEntries, setMiscEntries] = useState({});
   const [workOrderNotes, setWorkOrderNotes] = useState({});
@@ -59,6 +62,43 @@ export default function App() {
       }
     } catch {
       /* no-op in test or unsupported environments */
+    }
+  };
+
+  const normalizeRecord = (value) => (value && typeof value === "object" ? value : {});
+
+  const handleExportState = () => {
+    downloadStateJson(
+      buildStatePayload({
+        rawRows,
+        miscEntries,
+        workOrderNotes,
+        allocState,
+        selectedWO,
+        tab,
+      })
+    );
+  };
+
+  const handleStateImport = async (event) => {
+    const file = event.target?.files?.[0];
+    if (!file) return;
+    try {
+      const imported = await readStateJson(file);
+      if (!imported || imported.schemaVersion !== 1) {
+        throw new Error("Unsupported state file");
+      }
+      setRawRows(Array.isArray(imported.rawRows) ? imported.rawRows : demoRows);
+      setMiscEntries(normalizeRecord(imported.miscEntries));
+      setWorkOrderNotes(normalizeRecord(imported.workOrderNotes));
+      setAllocState(normalizeRecord(imported.allocState));
+      setSelectedWO(typeof imported.selectedWO === "string" ? imported.selectedWO : "");
+      setTab(imported.tab === "accounting" ? "accounting" : "engineering");
+    } catch (err) {
+      console.error("Failed to import JSON state", err);
+      safeAlert(`Failed to import JSON state: ${err?.message ?? err}`);
+    } finally {
+      if (event.target) event.target.value = "";
     }
   };
 
@@ -111,8 +151,19 @@ export default function App() {
   };
 
   const {
-    allocState, keyOf, getItemState, upsertAllocation, removeAllocation,
-    setAssetMeta, setReelSpan, removeReelSpan, getReelSpan, listReels, lockWorkOrder, setCableMode
+    allocState,
+    setAllocState,
+    keyOf,
+    getItemState,
+    upsertAllocation,
+    removeAllocation,
+    setAssetMeta,
+    setReelSpan,
+    removeReelSpan,
+    getReelSpan,
+    listReels,
+    lockWorkOrder,
+    setCableMode,
   } = useAllocations(groupedWithMisc);
 
   const workOrders = useMemo(() => Array.from(grouped.keys()).sort(naturalCompare), [grouped]);
@@ -170,8 +221,49 @@ export default function App() {
                 <div className="text-sm text-gray-600">XLSX/CSV with columns like: WORK ORDER, Order Lines, Order Lines/Delivery Quantity</div>
               </div>
             </div>
-            <input type="file" accept=".xlsx,.xls,.csv" onChange={handleFile} className="mt-3" />
+            <div className="mt-3 flex flex-wrap gap-2 items-center">
+              <input
+                ref={csvInputRef}
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                onChange={handleFile}
+                className="hidden"
+              />
+              <button
+                type="button"
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-2xl border border-slate-200 bg-white text-slate-900 hover:border-slate-300"
+                onClick={() => csvInputRef.current?.click()}
+              >
+                Choose spreadsheet
+              </button>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2 items-center">
+              <input
+                ref={stateInputRef}
+                type="file"
+                accept=".json,application/json"
+                onChange={handleStateImport}
+                className="hidden"
+              />
+              <button
+                type="button"
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-2xl border border-slate-200 bg-white text-slate-900 hover:border-slate-300"
+                onClick={() => stateInputRef.current?.click()}
+              >
+                Import JSON state
+              </button>
+              <button
+                type="button"
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-2xl bg-gray-900 text-white hover:bg-gray-800"
+                onClick={handleExportState}
+              >
+                Export JSON state
+              </button>
+            </div>
             <div className="text-xs text-gray-500 mt-2">No file? Using demo data.</div>
+            <div className="text-xs text-gray-500 mt-1">
+              JSON state captures allocations, reels, asset metadata, misc entries, and notes so nothing is lost.
+            </div>
           </div>
 
           <div className="bg-white rounded-2xl shadow p-4 border border-gray-100">
