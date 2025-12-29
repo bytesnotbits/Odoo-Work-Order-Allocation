@@ -46,16 +46,19 @@ export default function ProductCard({
   const finalCategory = () =>
     allocCategory === "__custom__" ? (allocCategoryCustom || "Custom") : allocCategory;
   const isCustomCategory = () => allocCategory === "__custom__";
+  const isReturnCategory = (category) => ["Returned", "Pending return"].includes(category);
 
   function addRegular() {
     const qty = Number(allocQty);
     if (!qty || qty <= 0) return safeAlert("Enter a positive quantity");
-    if (qty > remaining) return safeAlert("Quantity exceeds remaining available");
+    const categoryName = finalCategory();
+    const isReturn = isReturnCategory(categoryName);
+    if (!isReturn && qty > remaining) return safeAlert("Quantity exceeds remaining available");
     upsertAllocation(wo, product.code, {
       type: "regular",
       qty,
       allocationId: allocId || "",
-      allocationCategory: finalCategory(),
+      allocationCategory: categoryName,
       allocationCategoryIsCustom: isCustomCategory(),
       reelSerial
     });    setAllocQty(""); setAllocId(""); setReelSerial(""); setAllocCategory(ALLOCATION_OPTIONS[0]); setAllocCategoryCustom("");
@@ -64,7 +67,9 @@ export default function ProductCard({
   function addReelPiece() {
     if (!reelSerial) return safeAlert("Enter a Reel/Serial Number for this piece");
     if (reelFootage <= 0) return safeAlert("Enter valid outer/inner to compute footage");
-    if (reelFootage > remaining) return safeAlert("Footage exceeds remaining available");
+    const categoryName = finalCategory();
+    const isReturn = isReturnCategory(categoryName);
+    if (!isReturn && reelFootage > remaining) return safeAlert("Footage exceeds remaining available");
 
     const s = Math.min(Number(outer), Number(inner));
     const e = Math.max(Number(outer), Number(inner));
@@ -85,7 +90,7 @@ export default function ProductCard({
       inner: Number(inner),
       footage: reelFootage,
       allocationId: allocId || "",
-      allocationCategory: finalCategory(),
+      allocationCategory: categoryName,
       allocationCategoryIsCustom: isCustomCategory(),
       reelSerial
     });    setOuter(""); setInner(""); setAllocId(""); setReelSerial(""); setAllocCategory(ALLOCATION_OPTIONS[0]); setAllocCategoryCustom("");
@@ -287,12 +292,14 @@ export default function ProductCard({
                     <tr><td colSpan={12} className="text-sm text-gray-600 py-3">No allocations yet.</td></tr>
                   ) : (
                     extra.allocations.map(a => {
+                      const isPendingReturn = a.allocationCategory === "Pending return";
                       const raw = (extra.assets && extra.assets[a.id]) || {};
                       const m = typeof raw === 'object'
                         ? raw
                         : { assetId: raw ?? '', coeLoc: '', rackBay: '', sepcat: '' };
                       return (
-                      <tr key={a.id} className="border-t">                        <td className="whitespace-nowrap">{a.type}</td>
+                      <tr key={a.id} className={`border-t ${isPendingReturn ? "bg-yellow-50 text-yellow-700" : ""}`}>
+                        <td className="whitespace-nowrap">{a.type}</td>
                         <td className="whitespace-nowrap">{a.type === 'reel' ? a.footage : a.qty}</td>
                         <td className="whitespace-nowrap">{a.type === 'reel' ? a.outer : ''}</td>
                         <td className="whitespace-nowrap">{a.type === 'reel' ? a.inner : ''}</td>
@@ -300,36 +307,52 @@ export default function ProductCard({
                         <td className="whitespace-nowrap">{a.allocationCategory || ''}</td>
                         <td className="whitespace-nowrap">{a.reelSerial || ''}</td>
                         <td className="py-1">
-                          <input
-                            className="border rounded-lg p-1 w-40"
-                            placeholder="Asset ID"
-                            value={m.assetId || ''}
-                            onChange={(e) => setAssetMeta(wo, product.code, a.id, { assetId: e.target.value })}
-                          />
+                          {isPendingReturn ? (
+                            <span className="text-xs text-gray-500 uppercase tracking-wide">Info only</span>
+                          ) : (
+                            <input
+                              className="border rounded-lg p-1 w-40"
+                              placeholder="Asset ID"
+                              value={m.assetId || ''}
+                              onChange={(e) => setAssetMeta(wo, product.code, a.id, { assetId: e.target.value })}
+                            />
+                          )}
                         </td>
                         <td className="py-1">
-                          <input
-                            className="border rounded-lg p-1 w-32"
-                            placeholder="COE LOC"
-                            value={m.coeLoc || ''}
-                            onChange={(e) => setAssetMeta(wo, product.code, a.id, { coeLoc: e.target.value })}
-                          />
+                          {isPendingReturn ? (
+                            <span className="text-xs text-gray-500 uppercase tracking-wide">Info only</span>
+                          ) : (
+                            <input
+                              className="border rounded-lg p-1 w-32"
+                              placeholder="COE LOC"
+                              value={m.coeLoc || ''}
+                              onChange={(e) => setAssetMeta(wo, product.code, a.id, { coeLoc: e.target.value })}
+                            />
+                          )}
                         </td>
                         <td className="py-1">
-                          <input
-                            className="border rounded-lg p-1 w-32"
-                            placeholder="RACK/BAY"
-                            value={m.rackBay || ''}
-                            onChange={(e) => setAssetMeta(wo, product.code, a.id, { rackBay: e.target.value })}
-                          />
+                          {isPendingReturn ? (
+                            <span className="text-xs text-gray-500 uppercase tracking-wide">Info only</span>
+                          ) : (
+                            <input
+                              className="border rounded-lg p-1 w-32"
+                              placeholder="RACK/BAY"
+                              value={m.rackBay || ''}
+                              onChange={(e) => setAssetMeta(wo, product.code, a.id, { rackBay: e.target.value })}
+                            />
+                          )}
                         </td>
                         <td className="py-1">
-                          <input
-                            className="border rounded-lg p-1 w-28"
-                            placeholder="SEPCAT"
-                            value={m.sepcat || ''}
-                            onChange={(e) => setAssetMeta(wo, product.code, a.id, { sepcat: e.target.value })}
-                          />
+                          {isPendingReturn ? (
+                            <span className="text-xs text-gray-500 uppercase tracking-wide">Info only</span>
+                          ) : (
+                            <input
+                              className="border rounded-lg p-1 w-28"
+                              placeholder="SEPCAT"
+                              value={m.sepcat || ''}
+                              onChange={(e) => setAssetMeta(wo, product.code, a.id, { sepcat: e.target.value })}
+                            />
+                          )}
                         </td>
                         <td className="text-right">
                           <button
