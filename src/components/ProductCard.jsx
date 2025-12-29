@@ -6,7 +6,7 @@ import { Plus, Trash2, Ruler } from "lucide-react";
 export default function ProductCard({
   wo, product, getItemState,
   upsertAllocation, removeAllocation, setAssetMeta,
-  setReelSpan, removeReelSpan, getReelSpan, listReels, setCableMode, tab, locked,
+  setReelSpan, removeReelSpan, getReelSpan, listReels, setCableMode, addReelAllocation, tab, locked,
   isMiscRemovable = false, onRemoveMisc
 }) {
   // Avoid throwing in test environment where window.alert is "not implemented"
@@ -106,8 +106,21 @@ export default function ProductCard({
     const s = Math.min(Number(outer), Number(inner));
     const e = Math.max(Number(outer), Number(inner));
     const hasSpan = (spanMin !== null && spanMax !== null);
-      if (hasSpan) {
+    if (hasSpan) {
       if (s < spanMin || e > spanMax) return safeAlert("Piece is outside the defined span range");
+    }
+
+    const basePayload = {
+      type: "reel",
+      outer: Number(outer),
+      inner: Number(inner),
+      allocationId: allocId || "",
+      allocationCategory: categoryName,
+      allocationCategoryIsCustom: isCustomCategory(),
+      reelSerial,
+    };
+
+    if (hasSpan && !addReelAllocation) {
       for (const a of extra.allocations) {
         if (a.type !== "reel" || a.outer == null || a.inner == null) continue;
         if ((a.reelSerial || "") !== reelSerial) continue;
@@ -116,16 +129,18 @@ export default function ProductCard({
         if (Math.min(e, ee) > Math.max(s, es)) return safeAlert(`Overlap with existing piece [${es}–${ee}]`);
       }
     }
-    upsertAllocation(wo, product.code, {
-      type: "reel",
-      outer: Number(outer),
-      inner: Number(inner),
-      footage: reelFootage,
-      allocationId: allocId || "",
-      allocationCategory: categoryName,
-      allocationCategoryIsCustom: isCustomCategory(),
-      reelSerial
-    });    setOuter(""); setInner(""); setAllocId(""); setReelSerial(""); setAllocCategory(ALLOCATION_OPTIONS[0]); setAllocCategoryCustom("");
+
+    if (addReelAllocation) {
+      const result = addReelAllocation(wo, product.code, basePayload);
+      if (result?.error) return safeAlert(result.error);
+      setOuter(""); setInner(""); setAllocId(""); setReelSerial(""); setAllocCategory(ALLOCATION_OPTIONS[0]); setAllocCategoryCustom("");
+      return;
+    }
+
+    const payload = { ...basePayload, footage: reelFootage };
+    upsertAllocation(wo, product.code, payload);
+
+    setOuter(""); setInner(""); setAllocId(""); setReelSerial(""); setAllocCategory(ALLOCATION_OPTIONS[0]); setAllocCategoryCustom("");
   }
 
   const cardStateClasses = remaining === 0

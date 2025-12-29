@@ -8,6 +8,7 @@ import { isMiscProductCode, MISC_PRODUCT_CODE, MISC_PRODUCT_PREFIX } from "../li
 export default function WOView({
   wo, grouped, baseGrouped, getItemState, upsertAllocation, removeAllocation,
   setAssetMeta, setReelSpan, removeReelSpan, getReelSpan, listReels, lockWorkOrder, tab, allocState, setCableMode,
+  addReelAllocation,
   addMiscEntry, removeMiscEntry, nextMiscCode,
   workOrderNote, onWorkOrderNoteChange
 }) {
@@ -161,6 +162,7 @@ export default function WOView({
           getReelSpan={getReelSpan}
           listReels={listReels}
           setCableMode={setCableMode}
+          addReelAllocation={addReelAllocation}
           tab={tab}
           locked={(allocState[`${wo}|${p.code}`]?.locked) || false}
           isMiscRemovable={removableMisc}

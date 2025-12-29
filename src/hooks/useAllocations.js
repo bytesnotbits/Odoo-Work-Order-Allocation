@@ -250,6 +250,128 @@ export function useAllocations(grouped) {
     alert(`WO ${wo} marked complete.`);
   };
 
+  const normalizeReelBounds = (outer, inner) => {
+    const o = Number(outer);
+    const i = Number(inner);
+    if (!Number.isFinite(o) || !Number.isFinite(i)) return null;
+    const start = Math.min(o, i);
+    const end = Math.max(o, i);
+    if (start === end) return null;
+    return { start, end, outer: o, inner: i };
+  };
+
+  const splitPendingReturnAllocations = (allocations, interval, reelSerialKey) => {
+    const updated = [];
+    const removedIds = [];
+    for (const alloc of allocations) {
+      const serialKey = (alloc.reelSerial || "");
+      if (
+        alloc.type !== "reel" ||
+        serialKey !== reelSerialKey ||
+        alloc.allocationCategory !== "Pending return"
+      ) {
+        updated.push(alloc);
+        continue;
+      }
+      const bounds = normalizeReelBounds(alloc.outer, alloc.inner);
+      if (!bounds) {
+        updated.push(alloc);
+        continue;
+      }
+      const overlapStart = Math.max(bounds.start, interval.start);
+      const overlapEnd = Math.min(bounds.end, interval.end);
+      if (overlapStart >= overlapEnd) {
+        updated.push(alloc);
+        continue;
+      }
+      removedIds.push(alloc.id);
+      const template = { ...alloc };
+      delete template.id;
+      if (bounds.start < overlapStart) {
+        updated.push({
+          ...template,
+          id: uid(),
+          outer: overlapStart,
+          inner: bounds.start,
+          footage: Math.abs(overlapStart - bounds.start),
+        });
+      }
+      if (overlapEnd < bounds.end) {
+        updated.push({
+          ...template,
+          id: uid(),
+          outer: bounds.end,
+          inner: overlapEnd,
+          footage: Math.abs(bounds.end - overlapEnd),
+        });
+      }
+    }
+    return { allocations: updated, removedIds };
+  };
+
+  const detectReelOverlap = (allocations, reelSerialKey) => {
+    const intervals = allocations
+      .filter((alloc) => alloc.type === "reel" && (alloc.reelSerial || "") === reelSerialKey)
+      .map((alloc) => {
+        const bounds = normalizeReelBounds(alloc.outer, alloc.inner);
+        return bounds ? { ...bounds, id: alloc.id } : null;
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.start - b.start || a.end - b.end);
+    for (let i = 1; i < intervals.length; i += 1) {
+      if (intervals[i].start < intervals[i - 1].end) {
+        return { previous: intervals[i - 1], current: intervals[i] };
+      }
+    }
+    return null;
+  };
+
+  const addReelAllocation = (wo, code, alloc) => {
+    const bounds = normalizeReelBounds(alloc.outer, alloc.inner);
+    if (!bounds) {
+      return { error: "Enter valid outer/inner to compute footage" };
+    }
+    const reelSerialKey = (alloc.reelSerial || "");
+    const k = keyOf(wo, code);
+    const current = allocState[k] || { allocations: [], assets: {}, locked: false, reels: {}, coe: {}, cableMode: false };
+    const { allocations: staged, removedIds } = splitPendingReturnAllocations(
+      current.allocations,
+      { start: bounds.start, end: bounds.end },
+      reelSerialKey
+    );
+    const newAlloc = {
+      id: uid(),
+      ...alloc,
+      outer: bounds.outer,
+      inner: bounds.inner,
+      footage: Math.abs(bounds.end - bounds.start),
+    };
+    const candidateAllocations = [...staged, newAlloc];
+    const overlap = detectReelOverlap(candidateAllocations, reelSerialKey);
+    if (overlap) {
+      return { error: `Overlap with existing piece [${overlap.previous.start}–${overlap.previous.end}]` };
+    }
+    setAllocState((prev) => {
+      const cur = prev[k] || { allocations: [], assets: {}, locked: false, reels: {}, coe: {}, cableMode: false };
+      const adjustedAssets = { ...cur.assets };
+      const adjustedCoe = { ...(cur.coe || {}) };
+      for (const id of removedIds) {
+        if (adjustedAssets[id] !== undefined) delete adjustedAssets[id];
+        if (adjustedCoe[id] !== undefined) delete adjustedCoe[id];
+      }
+      return {
+        ...prev,
+        [k]: {
+          ...cur,
+          allocations: candidateAllocations,
+          assets: adjustedAssets,
+          coe: adjustedCoe,
+        },
+      };
+    });
+    return { success: true };
+  };
+
   return {
     allocState,
     setAllocState,
@@ -265,5 +387,6 @@ export function useAllocations(grouped) {
     getReelSpan,
     listReels,
     lockWorkOrder,
+    addReelAllocation,
   };
 }

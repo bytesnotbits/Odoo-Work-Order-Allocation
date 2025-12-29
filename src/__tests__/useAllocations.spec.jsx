@@ -156,6 +156,46 @@ test('returned allocations add footage back into remaining', () => {
   expect(s.remaining).toBe(1);
 });
 
+test('addReelAllocation splits pending return spans when returning a subset', () => {
+  const grouped = makeGrouped({ posted: 5000, returned: 0 });
+  const { result } = renderHook(() => useAllocations(grouped));
+
+  act(() => {
+    result.current.upsertAllocation('WO1','111', {
+      type: 'reel',
+      outer: 0,
+      inner: 5000,
+      allocationCategory: 'Pending return',
+      reelSerial: 'R1',
+      footage: 5000,
+    });
+  });
+
+  let response;
+  act(() => {
+    response = result.current.addReelAllocation('WO1','111', {
+      type: 'reel',
+      outer: 0,
+      inner: 2600,
+      allocationCategory: 'Returned',
+      allocationId: 'RETURN-1',
+      reelSerial: 'R1',
+    });
+  });
+
+  expect(response?.success).toBe(true);
+  const allocations = result.current.getItemState('WO1','111').extra.allocations;
+  expect(allocations).toHaveLength(2);
+  const returnedPiece = allocations.find((a) => a.allocationCategory === 'Returned');
+  expect(returnedPiece).toBeTruthy();
+  expect(Math.min(returnedPiece.inner, returnedPiece.outer)).toBe(0);
+  expect(Math.max(returnedPiece.inner, returnedPiece.outer)).toBe(2600);
+  const pendingPiece = allocations.find((a) => a.allocationCategory === 'Pending return');
+  expect(pendingPiece).toBeTruthy();
+  expect(Math.min(pendingPiece.inner, pendingPiece.outer)).toBe(2600);
+  expect(Math.max(pendingPiece.inner, pendingPiece.outer)).toBe(5000);
+});
+
 test('cableMode toggles independently of heuristic', () => {
   const grouped = makeGrouped();
   const { result } = renderHook(() => useAllocations(grouped));

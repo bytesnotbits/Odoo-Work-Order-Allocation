@@ -13,6 +13,7 @@ const baseProps = {
   upsertAllocation: vi.fn(), removeAllocation: vi.fn(),
   setAssetId: vi.fn(), setAssetMeta: vi.fn(),
   setReelSpan: vi.fn(), removeReelSpan: vi.fn(), getReelSpan: () => ({start:'', end:''}), listReels: () => [],
+  addReelAllocation: vi.fn(),
   locked:false
 };
 

@@ -35,6 +35,7 @@ function renderProductCard(overrides = {}) {
     removeReelSpan: vi.fn(),
     getReelSpan: () => ({ start: '', end: '' }),
     listReels: () => [],
+    addReelAllocation: vi.fn(),
   };
 
   return render(<ProductCard {...defaultProps} {...overrides} />);
