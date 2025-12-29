@@ -165,6 +165,7 @@ export default function App() {
     lockWorkOrder,
     setCableMode,
     addReelAllocation,
+    updateAllocation,
   } = useAllocations(groupedWithMisc);
 
   const workOrders = useMemo(() => Array.from(grouped.keys()).sort(naturalCompare), [grouped]);
@@ -341,6 +342,7 @@ export default function App() {
                 lockWorkOrder={lockWorkOrder}
                 setCableMode={setCableMode}
                 addReelAllocation={addReelAllocation}
+                updateAllocation={updateAllocation}
                 tab={tab}
                 allocState={allocState}
                 addMiscEntry={(itemNumber, description) => registerMiscEntry(activeWO, itemNumber, description)} // ensures function bound to current work order

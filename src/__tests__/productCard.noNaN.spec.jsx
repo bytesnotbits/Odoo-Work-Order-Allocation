@@ -26,6 +26,7 @@ const baseProps = {
   getReelSpan: () => ({ start: '', end: '' }),
   listReels: () => [],
   addReelAllocation: vi.fn(),
+  updateAllocation: vi.fn(),
 };
 
 test('does not render stray "+ NaN"', () => {

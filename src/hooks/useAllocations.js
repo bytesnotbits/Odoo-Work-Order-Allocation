@@ -326,7 +326,7 @@ export function useAllocations(grouped) {
     return null;
   };
 
-  const addReelAllocation = (wo, code, alloc) => {
+  const addReelAllocation = (wo, code, alloc, options = {}) => {
     const bounds = normalizeReelBounds(alloc.outer, alloc.inner);
     if (!bounds) {
       return { error: "Enter valid outer/inner to compute footage" };
@@ -334,13 +334,14 @@ export function useAllocations(grouped) {
     const reelSerialKey = (alloc.reelSerial || "");
     const k = keyOf(wo, code);
     const current = allocState[k] || { allocations: [], assets: {}, locked: false, reels: {}, coe: {}, cableMode: false };
+    const replaceId = options.replaceId;
     const { allocations: staged, removedIds } = splitPendingReturnAllocations(
       current.allocations,
       { start: bounds.start, end: bounds.end },
       reelSerialKey
     );
     const newAlloc = {
-      id: uid(),
+      id: replaceId || uid(),
       ...alloc,
       outer: bounds.outer,
       inner: bounds.inner,
@@ -356,6 +357,7 @@ export function useAllocations(grouped) {
       const adjustedAssets = { ...cur.assets };
       const adjustedCoe = { ...(cur.coe || {}) };
       for (const id of removedIds) {
+        if (id === newAlloc.id) continue;
         if (adjustedAssets[id] !== undefined) delete adjustedAssets[id];
         if (adjustedCoe[id] !== undefined) delete adjustedCoe[id];
       }
@@ -370,6 +372,18 @@ export function useAllocations(grouped) {
       };
     });
     return { success: true };
+  };
+
+  const updateAllocation = (wo, code, allocId, fields) => {
+    setAllocState((prev) => {
+      const k = keyOf(wo, code);
+      const cur = prev[k];
+      if (!cur) return prev;
+      const allocations = cur.allocations.map((a) =>
+        a.id === allocId ? { ...a, ...fields } : a
+      );
+      return { ...prev, [k]: { ...cur, allocations } };
+    });
   };
 
   return {
@@ -388,5 +402,6 @@ export function useAllocations(grouped) {
     listReels,
     lockWorkOrder,
     addReelAllocation,
+    updateAllocation,
   };
 }

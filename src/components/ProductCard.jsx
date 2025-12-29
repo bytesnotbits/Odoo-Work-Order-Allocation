@@ -6,7 +6,7 @@ import { Plus, Trash2, Ruler } from "lucide-react";
 export default function ProductCard({
   wo, product, getItemState,
   upsertAllocation, removeAllocation, setAssetMeta,
-  setReelSpan, removeReelSpan, getReelSpan, listReels, setCableMode, addReelAllocation, tab, locked,
+  setReelSpan, removeReelSpan, getReelSpan, listReels, setCableMode, addReelAllocation, updateAllocation, tab, locked,
   isMiscRemovable = false, onRemoveMisc
 }) {
   // Avoid throwing in test environment where window.alert is "not implemented"
@@ -29,6 +29,7 @@ export default function ProductCard({
   const [reelSerial, setReelSerial] = useState("");
   const [spanStartInput, setSpanStartInput] = useState("");
   const [spanEndInput, setSpanEndInput] = useState("");
+  const [selectedAllocation, setSelectedAllocation] = useState(null);
 
   if (!base) return null;
 
@@ -86,14 +87,25 @@ export default function ProductCard({
     const categoryName = finalCategory();
     const isReturn = isReturnCategory(categoryName);
     if (!isReturn && !isMiscProduct && qty > remaining) return safeAlert("Quantity exceeds remaining available");
-    upsertAllocation(wo, product.code, {
+    const payload = {
       type: "regular",
       qty,
       allocationId: allocId || "",
       allocationCategory: categoryName,
       allocationCategoryIsCustom: isCustomCategory(),
-      reelSerial
-    });    setAllocQty(""); setAllocId(""); setReelSerial(""); setAllocCategory(ALLOCATION_OPTIONS[0]); setAllocCategoryCustom("");
+      reelSerial,
+    };
+    if (selectedAllocation?.id && selectedAllocation.type !== "reel" && typeof updateAllocation === "function") {
+      updateAllocation(wo, product.code, selectedAllocation.id, payload);
+    } else {
+      upsertAllocation(wo, product.code, payload);
+    }
+    setAllocQty("");
+    setAllocId("");
+    setReelSerial("");
+    setAllocCategory(ALLOCATION_OPTIONS[0]);
+    setAllocCategoryCustom("");
+    setSelectedAllocation(null);
   }
 
   function addReelPiece() {
@@ -130,18 +142,54 @@ export default function ProductCard({
       }
     }
 
+    const editingReel = selectedAllocation?.id && selectedAllocation.type === "reel";
     if (addReelAllocation) {
-      const result = addReelAllocation(wo, product.code, basePayload);
+      const result = addReelAllocation(wo, product.code, basePayload, editingReel ? { replaceId: selectedAllocation.id } : undefined);
       if (result?.error) return safeAlert(result.error);
-      setOuter(""); setInner(""); setAllocId(""); setReelSerial(""); setAllocCategory(ALLOCATION_OPTIONS[0]); setAllocCategoryCustom("");
+      setOuter("");
+      setInner("");
+      setAllocId("");
+      setReelSerial("");
+      setAllocCategory(ALLOCATION_OPTIONS[0]);
+      setAllocCategoryCustom("");
+      setSelectedAllocation(null);
       return;
     }
 
     const payload = { ...basePayload, footage: reelFootage };
     upsertAllocation(wo, product.code, payload);
 
-    setOuter(""); setInner(""); setAllocId(""); setReelSerial(""); setAllocCategory(ALLOCATION_OPTIONS[0]); setAllocCategoryCustom("");
+    setOuter("");
+    setInner("");
+    setAllocId("");
+    setReelSerial("");
+    setAllocCategory(ALLOCATION_OPTIONS[0]);
+    setAllocCategoryCustom("");
+    setSelectedAllocation(null);
   }
+
+  const defaultCategory = ALLOCATION_OPTIONS[0] || "";
+  const handleSelectAllocation = (alloc) => {
+    setSelectedAllocation(alloc);
+    setAllocId(alloc.allocationId || "");
+    if (alloc.allocationCategoryIsCustom) {
+      setAllocCategory("__custom__");
+      setAllocCategoryCustom(alloc.allocationCategory || "");
+    } else {
+      setAllocCategory(alloc.allocationCategory || defaultCategory);
+      setAllocCategoryCustom("");
+    }
+    setReelSerial(alloc.reelSerial || "");
+    if (alloc.type === "reel") {
+      setOuter(formatSpanInput(alloc.outer));
+      setInner(formatSpanInput(alloc.inner));
+      setAllocQty("");
+    } else {
+      setAllocQty(alloc.qty != null ? String(alloc.qty) : "");
+      setOuter("");
+      setInner("");
+    }
+  };
 
   const cardStateClasses = remaining === 0
     ? "bg-green-50 border-green-200"
@@ -394,24 +442,43 @@ export default function ProductCard({
             ) : (
               <div className="space-y-3">
                 {extra.allocations.map((a) => {
-                  const isPendingReturn = a.allocationCategory === "Pending return";
-                  const raw = (extra.assets && extra.assets[a.id]) || {};
-                  const meta = typeof raw === "object"
-                    ? raw
-                    : { assetId: raw ?? "", coeLoc: "", rackBay: "", sepcat: "" };
-                  const numericValue = a.type === "reel" ? a.footage : a.qty;
-                  const outerValue = a.type === "reel" ? (a.outer ?? "—") : "—";
-                  const innerValue = a.type === "reel" ? (a.inner ?? "—") : "—";
-                  const chipBase = "px-2 py-1 rounded-full border text-[11px] font-semibold uppercase tracking-wide";
-                  const chipColor = isPendingReturn
-                    ? "border-yellow-200 bg-yellow-50 text-yellow-700"
+                const isPendingReturn = a.allocationCategory === "Pending return";
+                const isReturned = a.allocationCategory === "Returned";
+                const raw = (extra.assets && extra.assets[a.id]) || {};
+                const meta = typeof raw === "object"
+                  ? raw
+                  : { assetId: raw ?? "", coeLoc: "", rackBay: "", sepcat: "" };
+                const numericValue = a.type === "reel" ? a.footage : a.qty;
+                const outerValue = a.type === "reel" ? (a.outer ?? "—") : "—";
+                const innerValue = a.type === "reel" ? (a.inner ?? "—") : "—";
+                const chipBase = "px-2 py-1 rounded-full border text-[11px] font-semibold uppercase tracking-wide";
+                const chipColor = isPendingReturn
+                  ? "border-yellow-200 bg-yellow-50 text-yellow-700"
+                  : isReturned
+                    ? "border-slate-200 bg-white text-slate-400"
                     : "border-slate-200 bg-white text-slate-600";
-                  const cardColor = isPendingReturn
+                const cardColor = isPendingReturn
                     ? "border-yellow-200 bg-yellow-50 text-yellow-800"
-                    : "border-slate-200 bg-white text-slate-900";
+                    : isReturned
+                      ? "border-slate-200 bg-slate-100 text-slate-500"
+                      : "border-slate-200 bg-white text-slate-900";
                   const inputBase = "w-full border rounded-lg px-2 py-1 text-sm";
-                  return (
-                    <div key={a.id} className={`rounded-2xl border p-3 shadow-sm ${cardColor}`}>
+                const isSelectedAllocation = selectedAllocation?.id === a.id;
+                const selectionClasses = isSelectedAllocation ? "ring-2 ring-blue-500/50 shadow-lg" : "hover:shadow-md";
+                return (
+                    <div
+                      key={a.id}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => handleSelectAllocation(a)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          handleSelectAllocation(a);
+                        }
+                      }}
+                      className={`rounded-2xl border p-3 shadow-sm ${cardColor} ${selectionClasses} cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500`}
+                    >
                       <div className="flex items-center justify-between flex-wrap gap-2">
                         <div className="text-sm font-semibold">
                           {a.type === "reel" ? "Reel piece" : "Quantity allocation"}
@@ -419,7 +486,10 @@ export default function ProductCard({
                         <button
                           type="button"
                           className="inline-flex items-center justify-center px-2 py-1 rounded border text-sm"
-                          onClick={() => removeAllocation(wo, product.code, a.id)}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            removeAllocation(wo, product.code, a.id);
+                          }}
                           aria-label="Remove allocation"
                           disabled={locked}
                         >
@@ -459,6 +529,7 @@ export default function ProductCard({
                               placeholder="Asset ID"
                               value={meta.assetId || ""}
                               onChange={(e) => setAssetMeta(wo, product.code, a.id, { assetId: e.target.value })}
+                              onMouseDown={(event) => event.stopPropagation()}
                             />
                           )}
                         </div>
@@ -472,6 +543,7 @@ export default function ProductCard({
                               placeholder="COE LOC"
                               value={meta.coeLoc || ""}
                               onChange={(e) => setAssetMeta(wo, product.code, a.id, { coeLoc: e.target.value })}
+                              onMouseDown={(event) => event.stopPropagation()}
                             />
                           )}
                         </div>
@@ -485,6 +557,7 @@ export default function ProductCard({
                               placeholder="RACK/BAY"
                               value={meta.rackBay || ""}
                               onChange={(e) => setAssetMeta(wo, product.code, a.id, { rackBay: e.target.value })}
+                              onMouseDown={(event) => event.stopPropagation()}
                             />
                           )}
                         </div>
@@ -498,6 +571,7 @@ export default function ProductCard({
                               placeholder="SEPCAT"
                               value={meta.sepcat || ""}
                               onChange={(e) => setAssetMeta(wo, product.code, a.id, { sepcat: e.target.value })}
+                              onMouseDown={(event) => event.stopPropagation()}
                             />
                           )}
                         </div>

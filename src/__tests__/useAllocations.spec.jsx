@@ -196,6 +196,61 @@ test('addReelAllocation splits pending return spans when returning a subset', ()
   expect(Math.max(pendingPiece.inner, pendingPiece.outer)).toBe(5000);
 });
 
+test('updateAllocation mutates the existing regular allocation', () => {
+  const grouped = makeGrouped();
+  const { result } = renderHook(() => useAllocations(grouped));
+
+  act(() => {
+    result.current.upsertAllocation('WO1','190',{ type:'regular', qty:1, allocationCategory:'Aerial', allocationId:'A1' });
+  });
+
+  const alloc = result.current.getItemState('WO1','190').extra.allocations[0];
+  act(() => {
+    result.current.updateAllocation('WO1','190', alloc.id, { qty: 2, allocationCategory: 'Removal', allocationId: 'A2' });
+  });
+
+  const updated = result.current.getItemState('WO1','190').extra.allocations.find((a) => a.id === alloc.id);
+  expect(updated.qty).toBe(2);
+  expect(updated.allocationCategory).toBe('Removal');
+  expect(updated.allocationId).toBe('A2');
+});
+
+test('addReelAllocation keeps the ID when replacing a reel entry', () => {
+  const grouped = makeGrouped({ posted: 5000, returned: 0 });
+  const { result } = renderHook(() => useAllocations(grouped));
+
+  act(() => {
+    result.current.upsertAllocation('WO1','111', {
+      type: 'reel',
+      outer: 0,
+      inner: 5000,
+      allocationCategory: 'Pending return',
+      reelSerial: 'R1',
+      footage: 5000,
+    });
+  });
+
+  const pendingAlloc = result.current.getItemState('WO1','111').extra.allocations[0];
+  act(() => {
+    result.current.addReelAllocation('WO1','111', {
+      type: 'reel',
+      outer: 0,
+      inner: 2600,
+      allocationCategory: 'Returned',
+      allocationId: 'RETURN-1',
+      reelSerial: 'R1',
+    }, { replaceId: pendingAlloc.id });
+  });
+
+  const allocations = result.current.getItemState('WO1','111').extra.allocations;
+  const returned = allocations.find((a) => a.allocationCategory === 'Returned');
+  expect(returned).toBeTruthy();
+  expect(returned.id).toBe(pendingAlloc.id);
+  const pendingRemaining = allocations.find((a) => a.allocationCategory === 'Pending return');
+  expect(pendingRemaining).toBeTruthy();
+  expect(Math.min(pendingRemaining.inner, pendingRemaining.outer)).toBe(2600);
+});
+
 test('cableMode toggles independently of heuristic', () => {
   const grouped = makeGrouped();
   const { result } = renderHook(() => useAllocations(grouped));
