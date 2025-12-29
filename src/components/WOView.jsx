@@ -13,6 +13,7 @@ export default function WOView({
   const gm = grouped.get(wo) || new Map();
   const [miscDescription, setMiscDescription] = useState("");
   const [miscItemNumber, setMiscItemNumber] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
   const products = Array.from(gm.values()).sort((a, b) => naturalCompare(a.code, b.code));
   const isMiscProduct = (product) => isMiscProductCode(product.code);
   const productStates = products.map((product) => ({ product, state: getItemState(wo, product.code) }));
@@ -54,10 +55,43 @@ export default function WOView({
     product.code !== MISC_PRODUCT_CODE &&
     product.code.startsWith(MISC_PRODUCT_PREFIX)
   );
+  const hasManyProducts = products.length > 5;
+  const activeSearchTerm = hasManyProducts ? searchTerm.trim().toLowerCase() : "";
+  const matchesSearch = (product) => {
+    if (!activeSearchTerm) return true;
+    const searchTarget = `${product.code} ${product.desc || ""}`.toLowerCase();
+    return searchTarget.includes(activeSearchTerm);
+  };
+  const visibleProducts = activeSearchTerm ? products.filter(matchesSearch) : products;
+  const isSearchActive = Boolean(activeSearchTerm);
 
   return (
     <div className="space-y-6">
       {products.length === 0 && (<div className="text-sm text-gray-600">No products for this work order.</div>)}
+
+      {hasManyProducts && (
+        <div className="space-y-1 rounded-2xl border border-slate-200 bg-white p-3">
+          <div className="text-sm font-semibold text-slate-700">Search items</div>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <input
+              type="search"
+              placeholder="Search by item number or description"
+              className="flex-1 border rounded-xl px-3 py-2"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+            {isSearchActive && (
+              <div className="text-xs text-slate-500 sm:text-right sm:self-end">
+                Showing {visibleProducts.length} of {products.length}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {visibleProducts.length === 0 && products.length > 0 && (
+        <div className="text-sm text-gray-600">No items match that search.</div>
+      )}
 
       <div className="space-y-2 rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
         <div className="flex items-center justify-between">
@@ -89,7 +123,7 @@ export default function WOView({
         </div>
       </div>
 
-      {products.map((p) => {
+      {visibleProducts.map((p) => {
         const isImported = baseProducts.has(p.code);
         const removableMisc = isUserGeneratedMisc(p) && !isImported;
         const canRemoveMisc = removableMisc && typeof removeMiscEntry === "function";
