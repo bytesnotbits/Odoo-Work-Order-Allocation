@@ -5,6 +5,13 @@ export function normalizeRow(r, idx = 0) {
   const orderRef = String(r["Order Reference"] ?? r["Order"] ?? r["SO"] ?? "").trim();
   const itemCode = String(r["Item"] ?? r["ITEM"] ?? "").trim();
   const itemDesc = String(r["Item Description"] ?? r["ITEM DESCRIPTION"] ?? "").trim();
+  const workOrderDescription = String(
+    r["Description"]
+      ?? r["description"]
+      ?? r["Work Order Description"]
+      ?? r["WO Description"]
+      ?? ""
+  ).trim();
   const productLineRaw = r["Order Lines"] ?? r["Product"] ?? r["Item Description"] ?? r["Item"] ?? "";
   const productLine = String((itemCode || itemDesc)
     ? `${itemCode ? `[${itemCode}] ` : ""}${itemDesc || productLineRaw}`
@@ -30,7 +37,22 @@ export function normalizeRow(r, idx = 0) {
   const code = parsedCode || `LINE-${idx + 1}`;
   const desc = parsedDesc;
 
-  return { workOrder, orderRef, productLine, itemCode, itemDesc, code, desc, deliveryQty, cartQty, status, creationDate, customer, group: miGroup };
+  return {
+    workOrder,
+    orderRef,
+    productLine,
+    itemCode,
+    itemDesc,
+    code,
+    desc,
+    deliveryQty,
+    cartQty,
+    status,
+    creationDate,
+    customer,
+    group: miGroup,
+    workOrderDescription,
+  };
 }
 
 function parseNumber(v) {

@@ -33,6 +33,16 @@ export default function App() {
   const lastSavedPayloadRef = useRef(null);
   const rows = useMemo(() => rawRows.map(normalizeRow), [rawRows]);
   const grouped = useMemo(() => groupRows(rows), [rows]);
+  const workOrderDescriptions = useMemo(() => {
+    const map = new Map();
+    for (const row of rows) {
+      if (!row.workOrder) continue;
+      const desc = row.workOrderDescription;
+      if (!desc || map.has(row.workOrder)) continue;
+      map.set(row.workOrder, desc);
+    }
+    return map;
+  }, [rows]);
   const groupedWithMisc = useMemo(() => {
     const map = new Map();
     for (const [wo, gm] of grouped.entries()) {
@@ -75,7 +85,7 @@ export default function App() {
 
   const normalizeRecord = (value) => (value && typeof value === "object" ? value : {});
 
-  const markPayloadSaved = (payload) => {
+  const setBaselinePayload = (payload) => {
     lastSavedPayloadRef.current = JSON.stringify(payload);
     setHasUnsavedChanges(false);
   };
@@ -97,7 +107,7 @@ export default function App() {
     const filename = `${prefix}-${timestamp}.json`;
     downloadStateJson(payload, filename);
     setLastBackup({ filename, timestamp: new Date() });
-    setHasUnsavedChanges(false);
+    setBaselinePayload(payload);
   };
 
   const handleStateImport = async (event) => {
@@ -121,7 +131,7 @@ export default function App() {
       setAllocState(importedAlloc);
       setSelectedWO(importedSelectedWO);
       setTab(importedTab);
-      markPayloadSaved(
+      setBaselinePayload(
         buildStatePayload({
           rawRows: importedRows,
           miscEntries: importedMisc,
@@ -228,7 +238,7 @@ export default function App() {
           setAllocState(normalizedAlloc);
           setSelectedWO(normalizedSelectedWO);
           setTab(normalizedTab);
-          markPayloadSaved(
+          setBaselinePayload(
             buildStatePayload({
               rawRows: normalizedRows,
               miscEntries: normalizedMisc,
@@ -273,7 +283,6 @@ export default function App() {
         const meta = await savePersistedState(payload);
         if (canceled) return;
         if (meta) {
-          markPayloadSaved(payload);
           setLocalSnapshot({ savedAt: meta.savedAt, source: meta.source });
           setPersistError("");
         } else {
@@ -288,6 +297,9 @@ export default function App() {
 
     if (initialSaveRef.current) {
       initialSaveRef.current = false;
+      setHasUnsavedChanges(false);
+    } else if (lastSavedPayloadRef.current === null) {
+      setHasUnsavedChanges(true);
     } else {
       setHasUnsavedChanges(lastSavedPayloadRef.current !== payloadString);
     }
@@ -302,6 +314,7 @@ export default function App() {
   const miscEntriesForActive = miscEntries[activeWO] || [];
   const nextMiscCode = `${MISC_PRODUCT_PREFIX}${miscEntriesForActive.length + 1}`;
   const noteForActive = workOrderNotes[activeWO] || "";
+  const activeWODescription = workOrderDescriptions.get(activeWO) || "";
 
   const formatTimestamp = (value) => {
     if (!value) return "";
@@ -324,7 +337,7 @@ export default function App() {
       setSelectedWO("");
       setMiscEntries({});
       setWorkOrderNotes({});
-      markPayloadSaved(
+      setBaselinePayload(
         buildStatePayload({
           rawRows: json,
           miscEntries: {},
@@ -509,7 +522,7 @@ export default function App() {
 
         {activeWO ? (
           <>
-            <Section title={`Materials for WO ${activeWO}`} icon={Split}>
+            <Section title={`Materials for WO ${activeWO}`} subtitle={activeWODescription} icon={Split}>
               <WOView
                 wo={activeWO}
                 grouped={groupedWithMisc}
