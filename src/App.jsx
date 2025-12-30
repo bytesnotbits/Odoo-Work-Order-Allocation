@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { FileUp, Package2, Split, Download } from "lucide-react";
 
@@ -13,8 +13,14 @@ import { useAllocations } from "./hooks/useAllocations";
 import { readFirstSheet } from "./utils/xlsxIO";
 import { buildStatePayload, downloadStateJson, readStateJson } from "./utils/stateIO";
 import { loadPersistedState, savePersistedState } from "./utils/statePersistence";
+import { WORK_ORDER_HISTORY_STATUSES } from "./utils/workOrderHistory";
+import { useWorkOrderHistory } from "./hooks/useWorkOrderHistory";
 import { naturalCompare } from "./lib/natural";
 
+const HISTORY_STATUS_FILTERS = [
+  { value: "all", label: "All" },
+  ...WORK_ORDER_HISTORY_STATUSES,
+];
 export default function App() {
   const [rawRows, setRawRows] = useState(demoRows);
   const [selectedWO, setSelectedWO] = useState("");
@@ -27,6 +33,8 @@ export default function App() {
   const [lastBackup, setLastBackup] = useState(null);
   const [isHydrated, setIsHydrated] = useState(false);
   const initialSaveRef = useRef(true);
+  const [historyFilter, setHistoryFilter] = useState("");
+  const [historyStatusFilter, setHistoryStatusFilter] = useState("all");
 
   const [miscEntries, setMiscEntries] = useState({});
   const [workOrderNotes, setWorkOrderNotes] = useState({});
@@ -64,6 +72,14 @@ export default function App() {
     }
     return map;
   }, [grouped, miscEntries]);
+
+  const {
+    entries: workOrderHistory,
+    upsertEntry: upsertHistoryEntry,
+    removeEntry: removeHistoryEntry,
+    clearHistory,
+    setEntryStatus,
+  } = useWorkOrderHistory();
 
   const normalizeMiscItemNumber = (raw) => {
     if (!raw) return "";
@@ -118,29 +134,7 @@ export default function App() {
       if (!imported || imported.schemaVersion !== 1) {
         throw new Error("Unsupported state file");
       }
-      const importedRows = Array.isArray(imported.rawRows) ? imported.rawRows : demoRows;
-      const importedMisc = normalizeRecord(imported.miscEntries);
-      const importedNotes = normalizeRecord(imported.workOrderNotes);
-      const importedAlloc = normalizeRecord(imported.allocState);
-      const importedSelectedWO =
-        typeof imported.selectedWO === "string" ? imported.selectedWO : "";
-      const importedTab = imported.tab === "accounting" ? "accounting" : "engineering";
-      setRawRows(importedRows);
-      setMiscEntries(importedMisc);
-      setWorkOrderNotes(importedNotes);
-      setAllocState(importedAlloc);
-      setSelectedWO(importedSelectedWO);
-      setTab(importedTab);
-      setBaselinePayload(
-        buildStatePayload({
-          rawRows: importedRows,
-          miscEntries: importedMisc,
-          workOrderNotes: importedNotes,
-          allocState: importedAlloc,
-          selectedWO: importedSelectedWO,
-          tab: importedTab,
-        }),
-      );
+      applyPayload(imported);
     } catch (err) {
       console.error("Failed to import JSON state", err);
       safeAlert(`Failed to import JSON state: ${err?.message ?? err}`);
@@ -265,6 +259,89 @@ export default function App() {
     };
   }, [setAllocState]);
 
+  const applyPayload = (payload) => {
+    if (!payload) return;
+    const normalizedRows = Array.isArray(payload.rawRows) ? payload.rawRows : demoRows;
+    const normalizedMisc = normalizeRecord(payload.miscEntries);
+    const normalizedNotes = normalizeRecord(payload.workOrderNotes);
+    const normalizedAlloc = normalizeRecord(payload.allocState);
+    const normalizedSelectedWO =
+      typeof payload.selectedWO === "string" ? payload.selectedWO : "";
+    const normalizedTab = payload.tab === "accounting" ? "accounting" : "engineering";
+    setRawRows(normalizedRows);
+    setMiscEntries(normalizedMisc);
+    setWorkOrderNotes(normalizedNotes);
+    setAllocState(normalizedAlloc);
+    setSelectedWO(normalizedSelectedWO);
+    setTab(normalizedTab);
+    setBaselinePayload(
+      buildStatePayload({
+        rawRows: normalizedRows,
+        miscEntries: normalizedMisc,
+        workOrderNotes: normalizedNotes,
+        allocState: normalizedAlloc,
+        selectedWO: normalizedSelectedWO,
+        tab: normalizedTab,
+      }),
+    );
+  };
+
+  const buildWorkOrderSnapshot = useCallback(
+    (woId) => {
+      if (!woId) return null;
+      const filteredRows = [];
+      for (let i = 0; i < rows.length; i += 1) {
+        if (rows[i]?.workOrder === woId) {
+          filteredRows.push(rawRows[i]);
+        }
+      }
+      const miscForWO = {};
+      if (Array.isArray(miscEntries[woId]) && miscEntries[woId].length > 0) {
+        miscForWO[woId] = miscEntries[woId];
+      }
+      const noteForWO = workOrderNotes[woId];
+      const notesForWO = noteForWO ? { [woId]: noteForWO } : {};
+      const prefix = `${woId}|`;
+      const allocForWO = Object.entries(allocState).reduce((acc, [key, value]) => {
+        if (key.startsWith(prefix)) {
+          acc[key] = value;
+        }
+        return acc;
+      }, {});
+      return buildStatePayload({
+        rawRows: filteredRows,
+        miscEntries: miscForWO,
+        workOrderNotes: notesForWO,
+        allocState: allocForWO,
+        selectedWO: woId,
+        tab,
+      });
+    },
+    [allocState, miscEntries, rawRows, rows, tab, workOrderNotes],
+  );
+
+  const handleHistoryEntryLoad = (entry) => {
+    if (!entry?.id) return;
+    if (entry.snapshot) {
+      applyPayload(entry.snapshot);
+    } else {
+      const fallback = buildWorkOrderSnapshot(entry.id);
+      if (fallback) {
+        applyPayload(fallback);
+      }
+    }
+    setSelectedWO(entry.id);
+  };
+
+  const handleHistoryEntryExport = (entry) => {
+    if (!entry?.id) return;
+    const payload = entry.snapshot || buildWorkOrderSnapshot(entry.id);
+    if (!payload) return;
+    const filename = `${entry.id}-history-${filenameTimestamp()}.json`;
+    downloadStateJson(payload, filename);
+    setLastBackup({ filename, timestamp: new Date() });
+  };
+
   useEffect(() => {
     if (!isHydrated) return undefined;
     let canceled = false;
@@ -315,6 +392,29 @@ export default function App() {
   const nextMiscCode = `${MISC_PRODUCT_PREFIX}${miscEntriesForActive.length + 1}`;
   const noteForActive = workOrderNotes[activeWO] || "";
   const activeWODescription = workOrderDescriptions.get(activeWO) || "";
+
+  const normalizedHistoryFilter = historyFilter.trim().toLowerCase();
+  const filteredHistory = useMemo(() => {
+    return workOrderHistory.filter((entry) => {
+      if (!entry) return false;
+      const haystack = `${entry.id} ${entry.description || ""}`.toLowerCase();
+      const matchesTerm = normalizedHistoryFilter ? haystack.includes(normalizedHistoryFilter) : true;
+      const matchesStatus =
+        historyStatusFilter === "all" ? true : entry.status === historyStatusFilter;
+      return matchesTerm && matchesStatus;
+    });
+  }, [historyStatusFilter, normalizedHistoryFilter, workOrderHistory]);
+  useEffect(() => {
+    if (!isHydrated || !activeWO) return;
+    const payload = buildWorkOrderSnapshot(activeWO);
+    if (!payload) return;
+    upsertHistoryEntry({
+      id: activeWO,
+      description: activeWODescription,
+      lastOpened: new Date().toISOString(),
+      snapshot: payload,
+    });
+  }, [activeWO, activeWODescription, buildWorkOrderSnapshot, isHydrated, upsertHistoryEntry]);
 
   const formatTimestamp = (value) => {
     if (!value) return "";
@@ -466,17 +566,116 @@ export default function App() {
 
           <div className="bg-white rounded-2xl shadow p-4 border border-gray-100">
             <div className="space-y-3">
-              {/* Work Order select: full width */}
-              <div>
-                <div className="font-medium mb-1">Work Order</div>
-                <select
-                  className="w-full border rounded-xl p-2"
-                  value={activeWO}
-                  onChange={(e) => setSelectedWO(e.target.value)}
-                >
-                  {workOrders.length === 0 && <option value="">No work orders</option>}
-                  {workOrders.map((wo) => (<option key={wo} value={wo}>{wo}</option>))}
-                </select>
+              <div className="space-y-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <div className="font-medium">Work order history</div>
+                    <div className="text-xs text-slate-500">
+                      Search, load, export, or remove any work order you have opened.
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={workOrderHistory.length === 0}
+                    onClick={clearHistory}
+                    className="rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-medium text-rose-700 disabled:opacity-40"
+                  >
+                    Clear history
+                  </button>
+                </div>
+
+                <div className="space-y-2">
+                  <input
+                    type="text"
+                    placeholder="Search by work order or description"
+                    className="w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:border-slate-900 focus:ring-0"
+                    value={historyFilter}
+                    onChange={(event) => setHistoryFilter(event.target.value)}
+                  />
+                  <div className="flex flex-wrap gap-2 text-xs">
+                    {HISTORY_STATUS_FILTERS.map((filter) => (
+                      <button
+                        key={filter.value}
+                        type="button"
+                        onClick={() => setHistoryStatusFilter(filter.value)}
+                        className={[
+                          "rounded-full border px-3 py-1 font-medium transition",
+                          historyStatusFilter === filter.value
+                            ? "border-blue-500 bg-blue-50 text-blue-700"
+                            : "border-slate-200 bg-white text-slate-500 hover:border-slate-300",
+                        ].join(" ")}
+                      >
+                        {filter.label}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="min-h-[6rem] space-y-2 overflow-y-auto pr-2">
+                    {filteredHistory.length === 0 ? (
+                      <div className="text-xs text-slate-500">
+                        {workOrderHistory.length === 0
+                          ? "Load a work order and open it to start a history."
+                          : "No matching work orders found."}
+                      </div>
+                    ) : (
+                      filteredHistory.map((entry) => {
+                        const statusDefinition = WORK_ORDER_HISTORY_STATUSES.find(
+                          (statusOption) => statusOption.value === entry.status,
+                        );
+                        const statusLabel = statusDefinition?.label || entry.status;
+                        return (
+                          <div
+                            key={entry.id}
+                            className="rounded-2xl border border-slate-200 bg-slate-50 p-3"
+                          >
+                            <div className="flex items-center justify-between gap-3">
+                              <button
+                                type="button"
+                                onClick={() => handleHistoryEntryLoad(entry)}
+                                className="flex-1 text-left text-sm font-semibold text-slate-900 hover:underline"
+                              >
+                                {entry.id}
+                              </button>
+                              <span className="text-xs font-semibold text-slate-500">
+                                {statusLabel}
+                              </span>
+                            </div>
+                            <div className="mt-1 text-xs text-slate-500">
+                              {entry.description || "No description available"} · Last opened{" "}
+                              {formatTimestamp(entry.lastOpened)}
+                            </div>
+                            <div className="mt-2 flex flex-wrap items-center gap-2">
+                              <select
+                                value={entry.status}
+                                onChange={(event) => setEntryStatus(entry.id, event.target.value)}
+                                className="rounded-xl border border-slate-200 bg-white px-2 py-1 text-xs focus:border-slate-900"
+                              >
+                                {WORK_ORDER_HISTORY_STATUSES.map((statusOption) => (
+                                  <option key={statusOption.value} value={statusOption.value}>
+                                    {statusOption.label}
+                                  </option>
+                                ))}
+                              </select>
+                              <button
+                                type="button"
+                                onClick={() => handleHistoryEntryExport(entry)}
+                                className="rounded-2xl border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 hover:border-slate-300"
+                              >
+                                Export
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => removeHistoryEntry(entry.id)}
+                                className="rounded-2xl border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-rose-600 hover:border-rose-300"
+                              >
+                                Purge
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
               </div>
 
               {/* Mode (segmented control) */}
@@ -493,7 +692,7 @@ export default function App() {
                         "focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-900",
                         tab === "engineering"
                           ? "bg-white text-slate-900 font-semibold border border-blue-600 ring-2 ring-blue-600/75"
-                          : "bg-white text-slate-700 hover:bg-white/80 border border-slate-200"
+                          : "bg-white text-slate-700 hover:bg-white/80 border border-slate-200",
                       ].join(" ")}
                     >
                       Engineer
@@ -508,7 +707,7 @@ export default function App() {
                         "focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-900",
                         tab === "accounting"
                           ? "bg-white text-slate-900 font-semibold border border-blue-600 ring-2 ring-blue-600/75"
-                          : "bg-white text-slate-700 hover:bg-white/80 border border-slate-200"
+                          : "bg-white text-slate-700 hover:bg-white/80 border border-slate-200",
                       ].join(" ")}
                     >
                       Accountant
