@@ -140,7 +140,10 @@ export default function ProductCard({
     if (reelFootage <= 0) return safeAlert("Enter valid outer/inner to compute footage");
     const categoryName = finalCategory();
     const isReturn = isReturnCategory(categoryName);
-    if (!isReturn && !isMiscProduct && reelFootage > remaining) return safeAlert("Footage exceeds remaining available");
+    const editingReel = selectedAllocation?.id && selectedAllocation.type === "reel";
+    const existingReelFootage = editingReel ? Number(selectedAllocation?.footage ?? 0) : 0;
+    const availableFootage = editingReel ? remaining + existingReelFootage : remaining;
+    if (!isReturn && !isMiscProduct && reelFootage > availableFootage) return safeAlert("Footage exceeds remaining available");
 
     const s = Math.min(Number(outer), Number(inner));
     const e = Math.max(Number(outer), Number(inner));
@@ -169,7 +172,6 @@ export default function ProductCard({
       }
     }
 
-    const editingReel = selectedAllocation?.id && selectedAllocation.type === "reel";
     if (addReelAllocation) {
       const result = addReelAllocation(wo, product.code, basePayload, editingReel ? { replaceId: selectedAllocation.id } : undefined);
       if (result?.error) return safeAlert(result.error);
@@ -540,28 +542,34 @@ export default function ProductCard({
                           ✕
                         </button>
                       </div>
+                      {a.type === "reel" && (
+                        <div className="flex flex-wrap gap-2 mt-2 text-[11px]">
+                          <span className={`${chipBase} ${chipColor}`}>
+                            Reel Number: <b>{a.reelSerial || "—"}</b>
+                          </span>
+                          <span className={`${chipBase} ${chipColor}`}>
+                            Inner: <b>{innerValue}</b>
+                          </span>
+                          <span className={`${chipBase} ${chipColor}`}>
+                            Outer: <b>{outerValue}</b>
+                          </span>
+                        </div>
+                      )}
                       <div className="flex flex-wrap gap-2 mt-2 text-[11px]">
                         <span className={`${chipBase} ${chipColor}`}>
-                          Qty/Footage: <b className="text-xs uppercase">{numericValue ?? 0}</b>
-                        </span>
-                        <span className={`${chipBase} ${chipColor}`}>
-                          Outer: <b>{outerValue}</b>
-                        </span>
-                        <span className={`${chipBase} ${chipColor}`}>
-                          Inner: <b>{innerValue}</b>
-                        </span>
-                        <span className={`${chipBase} ${chipColor}`}>
-                          Reel/Serial: <b>{a.reelSerial || "—"}</b>
+                          Quantity: <b className="text-xs uppercase">{numericValue ?? 0}</b>
                         </span>
                         <span className={`${chipBase} ${chipColor}`}>
                           Category: <b>{a.allocationCategory || "Uncategorized"}</b>
                         </span>
-                        {a.allocationId && (
+                      </div>
+                      {a.allocationId && (
+                        <div className="flex flex-wrap gap-2 mt-2 text-[11px]">
                           <span className={`${chipBase} ${chipColor}`}>
                             Notes: <b>{a.allocationId}</b>
                           </span>
-                        )}
-                      </div>
+                        </div>
+                      )}
                       <div className="mt-3 grid gap-3 sm:grid-cols-2">
                         <div>
                           <div className="text-xs font-medium text-slate-500 uppercase tracking-wide">Asset ID</div>
