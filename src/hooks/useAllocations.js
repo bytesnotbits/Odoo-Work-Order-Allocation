@@ -15,7 +15,7 @@ export function useAllocations(grouped) {
     const isMisc = isMiscProductCode(code);
     const posted = base?.posted || 0;
     const returned = base?.returned || 0;
-    const totalAvailable = Math.max(posted - returned, 0);
+    const totalAvailable = Math.max(posted, 0);
     const allocationAmount = (alloc) => {
       if (alloc.type === "reel") {
         if (Number.isFinite(alloc.footage)) return Math.abs(alloc.footage);
@@ -52,7 +52,7 @@ export function useAllocations(grouped) {
     const allocatedSum = totals.installed;
     const returnedSum = totals.returned;
     const pendingReturnSum = totals.pending;
-    const netAllocated = allocatedSum - returnedSum;
+    const netAllocated = allocatedSum;
     const remaining = Math.max(totalAvailable - netAllocated, 0);
     const finalTotalAvailable = isMisc ? 0 : totalAvailable;
     const finalRemaining = isMisc ? 0 : remaining;

@@ -76,7 +76,7 @@ test('lockWorkOrder succeeds when everything allocated & asseted', () => {
   act(() => {
     // FIBER: allocate 8 as a single reel piece within some span (span not required for success)
     result.current.upsertAllocation('WO1','111', {
-      type:'reel', outer:0, inner:8, footage:8, allocationId:'R1', reelSerial:'REEL-1'
+      type:'reel', outer:0, inner:10, footage:10, allocationId:'R1', reelSerial:'REEL-1'
     })
     // POLE: allocate 2
     result.current.upsertAllocation('WO1','190', {
@@ -121,7 +121,7 @@ test('pending return entries do not consume remaining footage', () => {
   expect(s.remaining).toBe(2);
 });
 
-test('returned allocations add footage back into remaining', () => {
+test('returned allocations do not affect remaining', () => {
   const grouped = makeGrouped();
   const { result } = renderHook(() => useAllocations(grouped));
 
@@ -133,8 +133,8 @@ test('returned allocations add footage back into remaining', () => {
   const s = result.current.getItemState('WO1','190');
   expect(s.allocatedSum).toBe(2);
   expect(s.returnedSum).toBe(1);
-  expect(s.netAllocated).toBe(1);
-  expect(s.remaining).toBe(1);
+  expect(s.netAllocated).toBe(2);
+  expect(s.remaining).toBe(0);
 });
 
 test('addReelAllocation splits pending return spans when returning a subset', () => {

@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { FileUp, Package2, Split, Download } from "lucide-react";
 
@@ -12,6 +12,7 @@ import { exportAllocationsToXLSX } from "./lib/xlsxExport";
 import { useAllocations } from "./hooks/useAllocations";
 import { readFirstSheet } from "./utils/xlsxIO";
 import { buildStatePayload, downloadStateJson, readStateJson } from "./utils/stateIO";
+import { loadPersistedState, savePersistedState } from "./utils/statePersistence";
 import { naturalCompare } from "./lib/natural";
 
 export default function App() {
@@ -20,6 +21,12 @@ export default function App() {
   const [tab, setTab] = useState("engineering"); // "engineering" | "accounting"
   const stateInputRef = useRef(null);
   const csvInputRef = useRef(null);
+  const [localSnapshot, setLocalSnapshot] = useState(null);
+  const [persistError, setPersistError] = useState("");
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [lastBackup, setLastBackup] = useState(null);
+  const [isHydrated, setIsHydrated] = useState(false);
+  const initialSaveRef = useRef(true);
 
   const [miscEntries, setMiscEntries] = useState({});
   const [workOrderNotes, setWorkOrderNotes] = useState({});
@@ -67,17 +74,24 @@ export default function App() {
 
   const normalizeRecord = (value) => (value && typeof value === "object" ? value : {});
 
+  const filenameTimestamp = () => new Date().toISOString().replace(/[:.]/g, "-");
+
   const handleExportState = () => {
-    downloadStateJson(
-      buildStatePayload({
-        rawRows,
-        miscEntries,
-        workOrderNotes,
-        allocState,
-        selectedWO,
-        tab,
-      })
-    );
+    const workOrderIdentifier = selectedWO || workOrders[0] || "";
+    const prefix = workOrderIdentifier ? `${workOrderIdentifier}-allocation` : "allocation";
+    const timestamp = filenameTimestamp();
+    const payload = buildStatePayload({
+      rawRows,
+      miscEntries,
+      workOrderNotes,
+      allocState,
+      selectedWO,
+      tab,
+    });
+    const filename = `${prefix}-${timestamp}.json`;
+    downloadStateJson(payload, filename);
+    setLastBackup({ filename, timestamp: new Date() });
+    setHasUnsavedChanges(false);
   };
 
   const handleStateImport = async (event) => {
@@ -168,11 +182,96 @@ export default function App() {
     updateAllocation,
   } = useAllocations(groupedWithMisc);
 
+  useEffect(() => {
+    let canceled = false;
+    (async () => {
+      try {
+        const snapshot = await loadPersistedState();
+        if (canceled) return;
+        if (snapshot?.payload) {
+          setRawRows(
+            Array.isArray(snapshot.payload.rawRows) ? snapshot.payload.rawRows : demoRows
+          );
+          setMiscEntries(normalizeRecord(snapshot.payload.miscEntries));
+          setWorkOrderNotes(normalizeRecord(snapshot.payload.workOrderNotes));
+          setAllocState(normalizeRecord(snapshot.payload.allocState));
+          setSelectedWO(
+            typeof snapshot.payload.selectedWO === "string" ? snapshot.payload.selectedWO : ""
+          );
+          setTab(snapshot.payload.tab === "accounting" ? "accounting" : "engineering");
+        }
+        if (snapshot?.savedAt) {
+          setLocalSnapshot({ savedAt: snapshot.savedAt, source: snapshot.source });
+        }
+      } catch (err) {
+        console.error("Failed to load persisted state", err);
+      } finally {
+        if (!canceled) {
+          setIsHydrated(true);
+        }
+      }
+    })();
+    return () => {
+      canceled = true;
+    };
+  }, [setAllocState]);
+
+  useEffect(() => {
+    if (!isHydrated) return undefined;
+    let canceled = false;
+    const payload = buildStatePayload({
+      rawRows,
+      miscEntries,
+      workOrderNotes,
+      allocState,
+      selectedWO,
+      tab,
+    });
+
+    (async () => {
+      try {
+        const meta = await savePersistedState(payload);
+        if (canceled) return;
+        if (meta) {
+          setLocalSnapshot({ savedAt: meta.savedAt, source: meta.source });
+          setPersistError("");
+        } else {
+          setPersistError("Local persistence is unavailable in this browser.");
+        }
+      } catch (err) {
+        if (canceled) return;
+        console.error("Failed to persist state", err);
+        setPersistError(err?.message || "Unable to save data locally.");
+      }
+    })();
+
+    if (initialSaveRef.current) {
+      initialSaveRef.current = false;
+    } else {
+      setHasUnsavedChanges(true);
+    }
+
+    return () => {
+      canceled = true;
+    };
+  }, [rawRows, miscEntries, workOrderNotes, allocState, selectedWO, tab, isHydrated]);
+
   const workOrders = useMemo(() => Array.from(grouped.keys()).sort(naturalCompare), [grouped]);
   const activeWO = selectedWO || workOrders[0] || "";
   const miscEntriesForActive = miscEntries[activeWO] || [];
   const nextMiscCode = `${MISC_PRODUCT_PREFIX}${miscEntriesForActive.length + 1}`;
   const noteForActive = workOrderNotes[activeWO] || "";
+
+  const formatTimestamp = (value) => {
+    if (!value) return "";
+    try {
+      return new Date(value).toLocaleString();
+    } catch {
+      return String(value);
+    }
+  };
+
+  const snapshotSourceLabel = localSnapshot?.source === "indexedDB" ? "IndexedDB" : "browser storage";
   
 
   async function handleFile(e) {
@@ -191,13 +290,19 @@ export default function App() {
   }
 
   function exportAllocations() {
-    exportAllocationsToXLSX({
-      workOrders,
-      grouped: groupedWithMisc,
-      getItemState,
-      keyOf,
-      allocState,
-    }).catch((err) => {
+    const workOrderIdentifier = selectedWO || workOrders[0] || "";
+    const prefix = workOrderIdentifier ? `${workOrderIdentifier}-allocation` : "allocation";
+    const filename = `${prefix}-${filenameTimestamp()}.xlsx`;
+    exportAllocationsToXLSX(
+      {
+        workOrders,
+        grouped: groupedWithMisc,
+        getItemState,
+        keyOf,
+        allocState,
+      },
+      { filename },
+    ).catch((err) => {
       // eslint-disable-next-line no-console
       console.error("Failed to export allocations", err);
     });
@@ -213,6 +318,33 @@ export default function App() {
             Upload your <em>Sales Order (sale.order)</em> export, review posted vs. returned quantities, allocate materials (including cable reels), and hand off to accounting for Asset IDs.
           </p>
         </motion.header>
+
+        <div className="mb-6 flex flex-wrap items-center gap-3 text-xs">
+          <div
+            className={`px-2 py-1 rounded-full border ${
+              hasUnsavedChanges
+                ? "border-amber-200 bg-amber-50 text-amber-700"
+                : "border-emerald-200 bg-emerald-50 text-emerald-700"
+            }`}
+          >
+            {hasUnsavedChanges ? "Unsaved changes" : "All changes backed up"}
+          </div>
+          <div className="text-slate-600 whitespace-nowrap">
+            {localSnapshot
+              ? `Local snapshot (${snapshotSourceLabel}) saved ${formatTimestamp(localSnapshot.savedAt)}`
+              : "Waiting for local snapshot..."}
+          </div>
+          {lastBackup && (
+            <div className="text-slate-600 whitespace-nowrap">
+              Last export: {lastBackup.filename} @ {formatTimestamp(lastBackup.timestamp)}
+            </div>
+          )}
+          {persistError && (
+            <div className="px-2 py-1 rounded-full border border-red-100 bg-red-50 text-red-600">
+              {persistError}
+            </div>
+          )}
+        </div>
 
         <div className="grid md:grid-cols-3 gap-4 mb-6">
           <div className="md:col-span-2 bg-white rounded-2xl shadow p-4 border border-gray-100">
