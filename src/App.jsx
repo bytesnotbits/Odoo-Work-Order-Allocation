@@ -30,6 +30,7 @@ export default function App() {
 
   const [miscEntries, setMiscEntries] = useState({});
   const [workOrderNotes, setWorkOrderNotes] = useState({});
+  const lastSavedPayloadRef = useRef(null);
   const rows = useMemo(() => rawRows.map(normalizeRow), [rawRows]);
   const grouped = useMemo(() => groupRows(rows), [rows]);
   const groupedWithMisc = useMemo(() => {
@@ -74,6 +75,11 @@ export default function App() {
 
   const normalizeRecord = (value) => (value && typeof value === "object" ? value : {});
 
+  const markPayloadSaved = (payload) => {
+    lastSavedPayloadRef.current = JSON.stringify(payload);
+    setHasUnsavedChanges(false);
+  };
+
   const filenameTimestamp = () => new Date().toISOString().replace(/[:.]/g, "-");
 
   const handleExportState = () => {
@@ -102,12 +108,29 @@ export default function App() {
       if (!imported || imported.schemaVersion !== 1) {
         throw new Error("Unsupported state file");
       }
-      setRawRows(Array.isArray(imported.rawRows) ? imported.rawRows : demoRows);
-      setMiscEntries(normalizeRecord(imported.miscEntries));
-      setWorkOrderNotes(normalizeRecord(imported.workOrderNotes));
-      setAllocState(normalizeRecord(imported.allocState));
-      setSelectedWO(typeof imported.selectedWO === "string" ? imported.selectedWO : "");
-      setTab(imported.tab === "accounting" ? "accounting" : "engineering");
+      const importedRows = Array.isArray(imported.rawRows) ? imported.rawRows : demoRows;
+      const importedMisc = normalizeRecord(imported.miscEntries);
+      const importedNotes = normalizeRecord(imported.workOrderNotes);
+      const importedAlloc = normalizeRecord(imported.allocState);
+      const importedSelectedWO =
+        typeof imported.selectedWO === "string" ? imported.selectedWO : "";
+      const importedTab = imported.tab === "accounting" ? "accounting" : "engineering";
+      setRawRows(importedRows);
+      setMiscEntries(importedMisc);
+      setWorkOrderNotes(importedNotes);
+      setAllocState(importedAlloc);
+      setSelectedWO(importedSelectedWO);
+      setTab(importedTab);
+      markPayloadSaved(
+        buildStatePayload({
+          rawRows: importedRows,
+          miscEntries: importedMisc,
+          workOrderNotes: importedNotes,
+          allocState: importedAlloc,
+          selectedWO: importedSelectedWO,
+          tab: importedTab,
+        }),
+      );
     } catch (err) {
       console.error("Failed to import JSON state", err);
       safeAlert(`Failed to import JSON state: ${err?.message ?? err}`);
@@ -189,16 +212,32 @@ export default function App() {
         const snapshot = await loadPersistedState();
         if (canceled) return;
         if (snapshot?.payload) {
-          setRawRows(
-            Array.isArray(snapshot.payload.rawRows) ? snapshot.payload.rawRows : demoRows
+          const normalizedRows = Array.isArray(snapshot.payload.rawRows)
+            ? snapshot.payload.rawRows
+            : demoRows;
+          const normalizedMisc = normalizeRecord(snapshot.payload.miscEntries);
+          const normalizedNotes = normalizeRecord(snapshot.payload.workOrderNotes);
+          const normalizedAlloc = normalizeRecord(snapshot.payload.allocState);
+          const normalizedSelectedWO =
+            typeof snapshot.payload.selectedWO === "string" ? snapshot.payload.selectedWO : "";
+          const normalizedTab =
+            snapshot.payload.tab === "accounting" ? "accounting" : "engineering";
+          setRawRows(normalizedRows);
+          setMiscEntries(normalizedMisc);
+          setWorkOrderNotes(normalizedNotes);
+          setAllocState(normalizedAlloc);
+          setSelectedWO(normalizedSelectedWO);
+          setTab(normalizedTab);
+          markPayloadSaved(
+            buildStatePayload({
+              rawRows: normalizedRows,
+              miscEntries: normalizedMisc,
+              workOrderNotes: normalizedNotes,
+              allocState: normalizedAlloc,
+              selectedWO: normalizedSelectedWO,
+              tab: normalizedTab,
+            }),
           );
-          setMiscEntries(normalizeRecord(snapshot.payload.miscEntries));
-          setWorkOrderNotes(normalizeRecord(snapshot.payload.workOrderNotes));
-          setAllocState(normalizeRecord(snapshot.payload.allocState));
-          setSelectedWO(
-            typeof snapshot.payload.selectedWO === "string" ? snapshot.payload.selectedWO : ""
-          );
-          setTab(snapshot.payload.tab === "accounting" ? "accounting" : "engineering");
         }
         if (snapshot?.savedAt) {
           setLocalSnapshot({ savedAt: snapshot.savedAt, source: snapshot.source });
@@ -227,12 +266,14 @@ export default function App() {
       selectedWO,
       tab,
     });
+    const payloadString = JSON.stringify(payload);
 
     (async () => {
       try {
         const meta = await savePersistedState(payload);
         if (canceled) return;
         if (meta) {
+          markPayloadSaved(payload);
           setLocalSnapshot({ savedAt: meta.savedAt, source: meta.source });
           setPersistError("");
         } else {
@@ -248,7 +289,7 @@ export default function App() {
     if (initialSaveRef.current) {
       initialSaveRef.current = false;
     } else {
-      setHasUnsavedChanges(true);
+      setHasUnsavedChanges(lastSavedPayloadRef.current !== payloadString);
     }
 
     return () => {
@@ -283,6 +324,16 @@ export default function App() {
       setSelectedWO("");
       setMiscEntries({});
       setWorkOrderNotes({});
+      markPayloadSaved(
+        buildStatePayload({
+          rawRows: json,
+          miscEntries: {},
+          workOrderNotes: {},
+          allocState,
+          selectedWO: "",
+          tab,
+        }),
+      );
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error("Failed to read file", err);
