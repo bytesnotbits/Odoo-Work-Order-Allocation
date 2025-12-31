@@ -37,6 +37,7 @@ export default function App() {
   const [historyFilter, setHistoryFilter] = useState("");
   const [historyStatusFilter, setHistoryStatusFilter] = useState("all");
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [allowImplicitSelection, setAllowImplicitSelection] = useState(true);
   const searchWrapperRef = useRef(null);
   useEffect(() => {
     const handleClick = (event) => {
@@ -243,6 +244,7 @@ export default function App() {
           setWorkOrderNotes(normalizedNotes);
           setAllocState(normalizedAlloc);
           setSelectedWO(normalizedSelectedWO);
+          setAllowImplicitSelection(true);
           setTab(normalizedTab);
           setBaselinePayload(
             buildStatePayload({
@@ -285,6 +287,7 @@ export default function App() {
     setWorkOrderNotes(normalizedNotes);
     setAllocState(normalizedAlloc);
     setSelectedWO(normalizedSelectedWO);
+    setAllowImplicitSelection(true);
     setTab(normalizedTab);
     setBaselinePayload(
       buildStatePayload({
@@ -343,6 +346,7 @@ export default function App() {
       }
     }
     setSelectedWO(entry.id);
+    setAllowImplicitSelection(true);
   };
 
   const handleHistoryEntryExport = (entry) => {
@@ -399,7 +403,8 @@ export default function App() {
   }, [rawRows, miscEntries, workOrderNotes, allocState, selectedWO, tab, isHydrated]);
 
   const workOrders = useMemo(() => Array.from(grouped.keys()).sort(naturalCompare), [grouped]);
-  const activeWO = selectedWO || workOrders[0] || "";
+  const fallbackWO = allowImplicitSelection ? workOrders[0] || "" : "";
+  const activeWO = selectedWO || fallbackWO;
   const miscEntriesForActive = miscEntries[activeWO] || [];
   const nextMiscCode = `${MISC_PRODUCT_PREFIX}${miscEntriesForActive.length + 1}`;
   const noteForActive = workOrderNotes[activeWO] || "";
@@ -435,6 +440,16 @@ export default function App() {
     });
   }, [activeWO, activeWODescription, buildWorkOrderSnapshot, isHydrated, upsertHistoryEntry]);
 
+  const handleHistoryEntryPurge = (entryId) => {
+    if (!entryId) return;
+    const currentlyDisplayedWO = activeWO;
+    removeHistoryEntry(entryId);
+    if (entryId === currentlyDisplayedWO) {
+      setSelectedWO("");
+      setAllowImplicitSelection(false);
+    }
+  };
+
   const formatTimestamp = (value) => {
     if (!value) return "";
     try {
@@ -446,7 +461,7 @@ export default function App() {
 
   const snapshotSourceLabel = localSnapshot?.source === "indexedDB" ? "IndexedDB" : "browser storage";
   
-  const HistoryEntryCard = ({ entry, highlight = false }) => {
+  const HistoryEntryCard = ({ entry, highlight = false, onPurge }) => {
     const statusDefinition = WORK_ORDER_HISTORY_STATUSES.find(
       (statusOption) => statusOption.value === entry.status,
     );
@@ -495,7 +510,7 @@ export default function App() {
           </button>
           <button
             type="button"
-            onClick={() => removeHistoryEntry(entry.id)}
+            onClick={() => onPurge?.(entry.id)}
             className="rounded-2xl border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-rose-600 hover:border-rose-300"
           >
             Purge
@@ -513,6 +528,7 @@ export default function App() {
       const json = await readFirstSheet(file);
       setRawRows(json);
       setSelectedWO("");
+      setAllowImplicitSelection(true);
       setMiscEntries({});
       setWorkOrderNotes({});
       setBaselinePayload(
@@ -727,7 +743,7 @@ export default function App() {
                 {featuredHistoryEntry ? (
                   <>
                     <div className="text-xs text-slate-500">Currently open work order</div>
-                    <HistoryEntryCard entry={featuredHistoryEntry} highlight />
+                    <HistoryEntryCard entry={featuredHistoryEntry} highlight onPurge={handleHistoryEntryPurge} />
                   </>
                 ) : (
                   <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-xs text-slate-500">
