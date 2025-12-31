@@ -21,6 +21,7 @@ const HISTORY_STATUS_FILTERS = [
   { value: "all", label: "All" },
   ...WORK_ORDER_HISTORY_STATUSES,
 ];
+const DROPDOWN_SUGGESTION_LIMIT = 6;
 export default function App() {
   const [rawRows, setRawRows] = useState(demoRows);
   const [selectedWO, setSelectedWO] = useState("");
@@ -35,6 +36,17 @@ export default function App() {
   const initialSaveRef = useRef(true);
   const [historyFilter, setHistoryFilter] = useState("");
   const [historyStatusFilter, setHistoryStatusFilter] = useState("all");
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const searchWrapperRef = useRef(null);
+  useEffect(() => {
+    const handleClick = (event) => {
+      if (searchWrapperRef.current && !searchWrapperRef.current.contains(event.target)) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
 
   const [miscEntries, setMiscEntries] = useState({});
   const [workOrderNotes, setWorkOrderNotes] = useState({});
@@ -404,6 +416,13 @@ export default function App() {
       return matchesTerm && matchesStatus;
     });
   }, [historyStatusFilter, normalizedHistoryFilter, workOrderHistory]);
+
+  const featuredHistoryEntry =
+    workOrderHistory.find((entry) => entry.id === activeWO) || filteredHistory[0] || null;
+  const otherHistoryEntries = filteredHistory.filter(
+    (entry) => entry.id !== featuredHistoryEntry?.id,
+  );
+  const dropdownSuggestions = otherHistoryEntries.slice(0, DROPDOWN_SUGGESTION_LIMIT);
   useEffect(() => {
     if (!isHydrated || !activeWO) return;
     const payload = buildWorkOrderSnapshot(activeWO);
@@ -427,6 +446,65 @@ export default function App() {
 
   const snapshotSourceLabel = localSnapshot?.source === "indexedDB" ? "IndexedDB" : "browser storage";
   
+  const HistoryEntryCard = ({ entry, highlight = false }) => {
+    const statusDefinition = WORK_ORDER_HISTORY_STATUSES.find(
+      (statusOption) => statusOption.value === entry.status,
+    );
+    const statusLabel = statusDefinition?.label || entry.status;
+    return (
+      <div
+        className={[
+          "rounded-2xl border p-3",
+          highlight
+            ? "border-blue-300 bg-blue-50 shadow-inner"
+            : "border-slate-200 bg-slate-50",
+        ].join(" ")}
+      >
+        <div className="flex items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={() => handleHistoryEntryLoad(entry)}
+            className="flex-1 text-left text-sm font-semibold text-slate-900 hover:underline"
+          >
+            {entry.id}
+          </button>
+          <span className="text-xs font-semibold text-slate-500">{statusLabel}</span>
+        </div>
+        <div className="mt-1 text-xs text-slate-500">
+          {entry.description || "No description available"} · Last opened{" "}
+          {formatTimestamp(entry.lastOpened)}
+        </div>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <select
+            value={entry.status}
+            onChange={(event) => setEntryStatus(entry.id, event.target.value)}
+            className="rounded-xl border border-slate-200 bg-white px-2 py-1 text-xs focus:border-slate-900"
+          >
+            {WORK_ORDER_HISTORY_STATUSES.map((statusOption) => (
+              <option key={statusOption.value} value={statusOption.value}>
+                {statusOption.label}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={() => handleHistoryEntryExport(entry)}
+            className="rounded-2xl border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 hover:border-slate-300"
+          >
+            Export
+          </button>
+          <button
+            type="button"
+            onClick={() => removeHistoryEntry(entry.id)}
+            className="rounded-2xl border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-rose-600 hover:border-rose-300"
+          >
+            Purge
+          </button>
+        </div>
+      </div>
+    );
+  };
+
 
   async function handleFile(e) {
     const file = e.target.files?.[0];
@@ -566,116 +644,102 @@ export default function App() {
 
           <div className="bg-white rounded-2xl shadow p-4 border border-gray-100">
             <div className="space-y-3">
-              <div className="space-y-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <div className="font-medium">Work order history</div>
-                    <div className="text-xs text-slate-500">
-                      Search, load, export, or remove any work order you have opened.
-                    </div>
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <div className="font-medium">Work order history</div>
+                  <div className="text-xs text-slate-500">
+                    Search, load, export, or remove any work order you have opened.
                   </div>
-                  <button
-                    type="button"
-                    disabled={workOrderHistory.length === 0}
-                    onClick={clearHistory}
-                    className="rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-medium text-rose-700 disabled:opacity-40"
-                  >
-                    Clear history
-                  </button>
                 </div>
+                <button
+                  type="button"
+                  disabled={workOrderHistory.length === 0}
+                  onClick={clearHistory}
+                  className="rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-medium text-rose-700 disabled:opacity-40"
+                >
+                  Clear history
+                </button>
+              </div>
 
-                <div className="space-y-2">
+              <div className="space-y-2" ref={searchWrapperRef}>
+                <div className="relative">
                   <input
                     type="text"
                     placeholder="Search by work order or description"
                     className="w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:border-slate-900 focus:ring-0"
                     value={historyFilter}
-                    onChange={(event) => setHistoryFilter(event.target.value)}
+                    onFocus={() => setShowSuggestions(true)}
+                    onChange={(event) => {
+                      setHistoryFilter(event.target.value);
+                      setShowSuggestions(true);
+                    }}
                   />
-                  <div className="flex flex-wrap gap-2 text-xs">
-                    {HISTORY_STATUS_FILTERS.map((filter) => (
-                      <button
-                        key={filter.value}
-                        type="button"
-                        onClick={() => setHistoryStatusFilter(filter.value)}
-                        className={[
-                          "rounded-full border px-3 py-1 font-medium transition",
-                          historyStatusFilter === filter.value
-                            ? "border-blue-500 bg-blue-50 text-blue-700"
-                            : "border-slate-200 bg-white text-slate-500 hover:border-slate-300",
-                        ].join(" ")}
-                      >
-                        {filter.label}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="min-h-[6rem] space-y-2 overflow-y-auto pr-2">
-                    {filteredHistory.length === 0 ? (
-                      <div className="text-xs text-slate-500">
-                        {workOrderHistory.length === 0
-                          ? "Load a work order and open it to start a history."
-                          : "No matching work orders found."}
-                      </div>
-                    ) : (
-                      filteredHistory.map((entry) => {
-                        const statusDefinition = WORK_ORDER_HISTORY_STATUSES.find(
-                          (statusOption) => statusOption.value === entry.status,
-                        );
-                        const statusLabel = statusDefinition?.label || entry.status;
-                        return (
-                          <div
+                  {showSuggestions && (
+                    <div className="absolute inset-x-0 top-full z-10 mt-1 max-h-56 overflow-auto rounded-2xl border border-slate-200 bg-white shadow-lg">
+                      {dropdownSuggestions.length > 0 ? (
+                        dropdownSuggestions.map((entry) => (
+                          <button
                             key={entry.id}
-                            className="rounded-2xl border border-slate-200 bg-slate-50 p-3"
+                            type="button"
+                            onClick={() => {
+                              handleHistoryEntryLoad(entry);
+                              setHistoryFilter("");
+                              setShowSuggestions(false);
+                            }}
+                            className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
                           >
-                            <div className="flex items-center justify-between gap-3">
-                              <button
-                                type="button"
-                                onClick={() => handleHistoryEntryLoad(entry)}
-                                className="flex-1 text-left text-sm font-semibold text-slate-900 hover:underline"
-                              >
-                                {entry.id}
-                              </button>
-                              <span className="text-xs font-semibold text-slate-500">
-                                {statusLabel}
-                              </span>
+                            <div className="font-semibold text-slate-900">{entry.id}</div>
+                            <div className="text-xs text-slate-500">
+                              {entry.description || "No description available"}
                             </div>
-                            <div className="mt-1 text-xs text-slate-500">
-                              {entry.description || "No description available"} · Last opened{" "}
-                              {formatTimestamp(entry.lastOpened)}
-                            </div>
-                            <div className="mt-2 flex flex-wrap items-center gap-2">
-                              <select
-                                value={entry.status}
-                                onChange={(event) => setEntryStatus(entry.id, event.target.value)}
-                                className="rounded-xl border border-slate-200 bg-white px-2 py-1 text-xs focus:border-slate-900"
-                              >
-                                {WORK_ORDER_HISTORY_STATUSES.map((statusOption) => (
-                                  <option key={statusOption.value} value={statusOption.value}>
-                                    {statusOption.label}
-                                  </option>
-                                ))}
-                              </select>
-                              <button
-                                type="button"
-                                onClick={() => handleHistoryEntryExport(entry)}
-                                className="rounded-2xl border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 hover:border-slate-300"
-                              >
-                                Export
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => removeHistoryEntry(entry.id)}
-                                className="rounded-2xl border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-rose-600 hover:border-rose-300"
-                              >
-                                Purge
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
+                          </button>
+                        ))
+                      ) : (
+                        <div className="px-3 py-2 text-sm text-slate-500">
+                          {historyFilter
+                            ? `No work orders match "${historyFilter}".`
+                            : "No other work orders available in your history yet."}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
+                <div className="flex flex-wrap gap-2 text-xs">
+                  {HISTORY_STATUS_FILTERS.map((filter) => (
+                    <button
+                      key={filter.value}
+                      type="button"
+                      onClick={() => setHistoryStatusFilter(filter.value)}
+                      className={[
+                        "rounded-full border px-3 py-1 font-medium transition",
+                        historyStatusFilter === filter.value
+                          ? "border-blue-500 bg-blue-50 text-blue-700"
+                          : "border-slate-200 bg-white text-slate-500 hover:border-slate-300",
+                      ].join(" ")}
+                    >
+                      {filter.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                {featuredHistoryEntry ? (
+                  <>
+                    <div className="text-xs text-slate-500">Currently open work order</div>
+                    <HistoryEntryCard entry={featuredHistoryEntry} highlight />
+                  </>
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-xs text-slate-500">
+                    Load a work order to populate your history.
+                  </div>
+                )}
+              </div>
+
+              <div className="text-xs text-slate-500">
+                {otherHistoryEntries.length === 0
+                  ? "No other work orders match the current filters."
+                  : `${otherHistoryEntries.length} other work order${otherHistoryEntries.length === 1 ? "" : "s"} available via search.`}
               </div>
 
               {/* Mode (segmented control) */}
