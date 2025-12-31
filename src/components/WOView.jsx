@@ -10,7 +10,6 @@ export default function WOView({
   setAssetMeta, setReelSpan, removeReelSpan, getReelSpan, listReels, lockWorkOrder, tab, allocState, setCableMode,
   addReelAllocation, updateAllocation,
   addMiscEntry, removeMiscEntry, nextMiscCode,
-  workOrderNote, onWorkOrderNoteChange
 }) {
   const gm = grouped.get(wo) || new Map();
   const [miscDescription, setMiscDescription] = useState("");
@@ -66,13 +65,6 @@ export default function WOView({
   };
   const visibleProducts = activeSearchTerm ? products.filter(matchesSearch) : products;
   const isSearchActive = Boolean(activeSearchTerm);
-  const noteValue = workOrderNote || "";
-  const handleNoteChange = (value) => {
-    if (typeof onWorkOrderNoteChange === "function") {
-      onWorkOrderNoteChange(value);
-    }
-  };
-
   return (
     <div className="space-y-6">
       {products.length === 0 && (<div className="text-sm text-gray-600">No products for this work order.</div>)}
@@ -100,19 +92,6 @@ export default function WOView({
       {visibleProducts.length === 0 && products.length > 0 && (
         <div className="text-sm text-gray-600">No items match that search.</div>
       )}
-
-      <div className="space-y-2 rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4">
-        <div className="text-sm font-semibold text-slate-900">Work order notes</div>
-        <textarea
-          placeholder="Log misc install status, returns, or follow-ups for the work order."
-          className="w-full border rounded-2xl px-3 py-2 min-h-[80px] text-sm leading-relaxed"
-          value={noteValue}
-          onChange={(e) => handleNoteChange(e.target.value)}
-        />
-        <div className="text-xs text-gray-500">
-          Notes are saved per work order and persist while this session is running.
-        </div>
-      </div>
 
       <div className="space-y-2 rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
         <div className="flex items-center justify-between">

@@ -604,8 +604,8 @@ export default function App() {
           )}
         </div>
 
-        <div className="grid md:grid-cols-3 gap-4 mb-6">
-          <div className="md:col-span-2 bg-white rounded-2xl shadow p-4 border border-gray-100">
+        <div className="grid gap-4 mb-6 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] md:grid-rows-[auto_auto]">
+          <div className="bg-white rounded-2xl shadow p-4 border border-gray-100 md:col-start-1 md:row-start-1 md:row-end-2">
             <div className="flex items-center gap-3">
               <FileUp className="w-5 h-5" />
               <div>
@@ -658,145 +658,158 @@ export default function App() {
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl shadow p-4 border border-gray-100">
-            <div className="space-y-3">
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <div className="font-medium">Work order history</div>
-                  <div className="text-xs text-slate-500">
-                    Search, load, export, or remove any work order you have opened.
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  disabled={workOrderHistory.length === 0}
-                  onClick={clearHistory}
-                  className="rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-medium text-rose-700 disabled:opacity-40"
-                >
-                  Clear history
-                </button>
-              </div>
-
-              <div className="space-y-2" ref={searchWrapperRef}>
-                <div className="relative">
-                  <input
-                    type="text"
-                    placeholder="Search by work order or description"
-                    className="w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:border-slate-900 focus:ring-0"
-                    value={historyFilter}
-                    onFocus={() => setShowSuggestions(true)}
-                    onChange={(event) => {
-                      setHistoryFilter(event.target.value);
-                      setShowSuggestions(true);
-                    }}
-                  />
-                  {showSuggestions && (
-                    <div className="absolute inset-x-0 top-full z-10 mt-1 max-h-56 overflow-auto rounded-2xl border border-slate-200 bg-white shadow-lg">
-                      {dropdownSuggestions.length > 0 ? (
-                        dropdownSuggestions.map((entry) => (
-                          <button
-                            key={entry.id}
-                            type="button"
-                            onClick={() => {
-                              handleHistoryEntryLoad(entry);
-                              setHistoryFilter("");
-                              setShowSuggestions(false);
-                            }}
-                            className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
-                          >
-                            <div className="font-semibold text-slate-900">{entry.id}</div>
-                            <div className="text-xs text-slate-500">
-                              {entry.description || "No description available"}
-                            </div>
-                          </button>
-                        ))
-                      ) : (
-                        <div className="px-3 py-2 text-sm text-slate-500">
-                          {historyFilter
-                            ? `No work orders match "${historyFilter}".`
-                            : "No other work orders available in your history yet."}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-                <div className="flex flex-wrap gap-2 text-xs">
-                  {HISTORY_STATUS_FILTERS.map((filter) => (
-                    <button
-                      key={filter.value}
-                      type="button"
-                      onClick={() => setHistoryStatusFilter(filter.value)}
-                      className={[
-                        "rounded-full border px-3 py-1 font-medium transition",
-                        historyStatusFilter === filter.value
-                          ? "border-blue-500 bg-blue-50 text-blue-700"
-                          : "border-slate-200 bg-white text-slate-500 hover:border-slate-300",
-                      ].join(" ")}
-                    >
-                      {filter.label}
-                    </button>
-                  ))}
+          <div className="space-y-3 bg-white rounded-2xl shadow p-4 border border-gray-100 md:col-start-2 md:row-start-1 md:row-end-3">
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <div className="font-medium">Work order history</div>
+                <div className="text-xs text-slate-500">
+                  Search, load, export, or remove any work order you have opened.
                 </div>
               </div>
+              <button
+                type="button"
+                disabled={workOrderHistory.length === 0}
+                onClick={clearHistory}
+                className="rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-medium text-rose-700 disabled:opacity-40"
+              >
+                Clear history
+              </button>
+            </div>
 
-              <div className="space-y-3">
-                {featuredHistoryEntry ? (
-                  <>
-                    <div className="text-xs text-slate-500">Currently open work order</div>
-                    <HistoryEntryCard entry={featuredHistoryEntry} highlight onPurge={handleHistoryEntryPurge} />
-                  </>
-                ) : (
-                  <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-xs text-slate-500">
-                    Load a work order to populate your history.
+            <div className="space-y-2" ref={searchWrapperRef}>
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Search by work order or description"
+                  className="w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:border-slate-900 focus:ring-0"
+                  value={historyFilter}
+                  onFocus={() => setShowSuggestions(true)}
+                  onChange={(event) => {
+                    setHistoryFilter(event.target.value);
+                    setShowSuggestions(true);
+                  }}
+                />
+                {showSuggestions && (
+                  <div className="absolute inset-x-0 top-full z-10 mt-1 max-h-56 overflow-auto rounded-2xl border border-slate-200 bg-white shadow-lg">
+                    {dropdownSuggestions.length > 0 ? (
+                      dropdownSuggestions.map((entry) => (
+                        <button
+                          key={entry.id}
+                          type="button"
+                          onClick={() => {
+                            handleHistoryEntryLoad(entry);
+                            setHistoryFilter("");
+                            setShowSuggestions(false);
+                          }}
+                          className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+                        >
+                          <div className="font-semibold text-slate-900">{entry.id}</div>
+                          <div className="text-xs text-slate-500">
+                            {entry.description || "No description available"}
+                          </div>
+                        </button>
+                      ))
+                    ) : (
+                      <div className="px-3 py-2 text-sm text-slate-500">
+                        {historyFilter
+                          ? `No work orders match "${historyFilter}".`
+                          : "No other work orders available in your history yet."}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
-
-              <div className="text-xs text-slate-500">
-                {otherHistoryEntries.length === 0
-                  ? "No other work orders match the current filters."
-                  : `${otherHistoryEntries.length} other work order${otherHistoryEntries.length === 1 ? "" : "s"} available via search.`}
+              <div className="flex flex-wrap gap-2 text-xs">
+                {HISTORY_STATUS_FILTERS.map((filter) => (
+                  <button
+                    key={filter.value}
+                    type="button"
+                    onClick={() => setHistoryStatusFilter(filter.value)}
+                    className={[
+                      "rounded-full border px-3 py-1 font-medium transition",
+                      historyStatusFilter === filter.value
+                        ? "border-blue-500 bg-blue-50 text-blue-700"
+                        : "border-slate-200 bg-white text-slate-500 hover:border-slate-300",
+                    ].join(" ")}
+                  >
+                    {filter.label}
+                  </button>
+                ))}
               </div>
+            </div>
 
-              {/* Mode (segmented control) */}
-              <div className="space-y-1" aria-label="Mode">
-                <div className="text-sm text-slate-600">Mode</div>
-                <div className="bg-slate-100 rounded-xl p-1">
-                  <div className="flex flex-col gap-1">
-                    <button
-                      type="button"
-                      onClick={() => setTab("engineering")}
-                      aria-pressed={tab === "engineering"}
-                      className={[
-                        "w-full px-3 py-2 rounded-lg transition",
-                        "focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-900",
-                        tab === "engineering"
-                          ? "bg-white text-slate-900 font-semibold border border-blue-600 ring-2 ring-blue-600/75"
-                          : "bg-white text-slate-700 hover:bg-white/80 border border-slate-200",
-                      ].join(" ")}
-                    >
-                      Engineer
-                    </button>
+            <div className="space-y-3">
+              {featuredHistoryEntry ? (
+                <>
+                  <div className="text-xs text-slate-500">Currently open work order</div>
+                  <HistoryEntryCard entry={featuredHistoryEntry} highlight onPurge={handleHistoryEntryPurge} />
+                </>
+              ) : (
+                <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-xs text-slate-500">
+                  Load a work order to populate your history.
+                </div>
+              )}
+            </div>
 
-                    <button
-                      type="button"
-                      onClick={() => setTab("accounting")}
-                      aria-pressed={tab === "accounting"}
-                      className={[
-                        "w-full px-3 py-2 rounded-lg transition",
-                        "focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-900",
-                        tab === "accounting"
-                          ? "bg-white text-slate-900 font-semibold border border-blue-600 ring-2 ring-blue-600/75"
-                          : "bg-white text-slate-700 hover:bg-white/80 border border-slate-200",
-                      ].join(" ")}
-                    >
-                      Accountant
-                    </button>
-                  </div>
+            <div className="text-xs text-slate-500">
+              {otherHistoryEntries.length === 0
+                ? "No other work orders match the current filters."
+                : `${otherHistoryEntries.length} other work order${otherHistoryEntries.length === 1 ? "" : "s"} available via search.`}
+            </div>
+
+            {/* Mode (segmented control) */}
+            <div className="space-y-1" aria-label="Mode">
+              <div className="text-sm text-slate-600">Mode</div>
+              <div className="bg-slate-100 rounded-xl p-1">
+                <div className="flex flex-col gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setTab("engineering")}
+                    aria-pressed={tab === "engineering"}
+                    className={[
+                      "w-full px-3 py-2 rounded-lg transition",
+                      "focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-900",
+                      tab === "engineering"
+                        ? "bg-white text-slate-900 font-semibold border border-blue-600 ring-2 ring-blue-600/75"
+                        : "bg-white text-slate-700 hover:bg-white/80 border border-slate-200",
+                    ].join(" ")}
+                  >
+                    Engineer
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setTab("accounting")}
+                    aria-pressed={tab === "accounting"}
+                    className={[
+                      "w-full px-3 py-2 rounded-lg transition",
+                      "focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-900",
+                      tab === "accounting"
+                        ? "bg-white text-slate-900 font-semibold border border-blue-600 ring-2 ring-blue-600/75"
+                        : "bg-white text-slate-700 hover:bg-white/80 border border-slate-200",
+                    ].join(" ")}
+                  >
+                    Accountant
+                  </button>
                 </div>
               </div>
             </div>
           </div>
+
+          {activeWO && (
+            <div className="space-y-2 rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 md:col-start-1 md:row-start-2 md:row-end-3">
+              <div className="text-sm font-semibold text-slate-900">Work order notes</div>
+              <textarea
+                placeholder="Log misc install status, returns, or follow-ups for the work order."
+                className="w-full rounded-2xl border px-3 py-2 min-h-[80px] text-sm leading-relaxed"
+                value={noteForActive}
+                onChange={(event) => updateWorkOrderNote(activeWO, event.target.value)}
+              />
+              <div className="text-xs text-gray-500">
+                Notes are saved per work order and persist while this session is running.
+              </div>
+            </div>
+          )}
         </div>
 
         {activeWO ? (
@@ -823,8 +836,6 @@ export default function App() {
                 addMiscEntry={(itemNumber, description) => registerMiscEntry(activeWO, itemNumber, description)} // ensures function bound to current work order
                 removeMiscEntry={(code) => removeMiscEntry(activeWO, code)}
                 nextMiscCode={nextMiscCode}
-                workOrderNote={noteForActive}
-                onWorkOrderNoteChange={(note) => updateWorkOrderNote(activeWO, note)}
               />
             </Section>
 
