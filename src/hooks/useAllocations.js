@@ -219,23 +219,21 @@ export function useAllocations(grouped) {
       // determine SCXR from grouped data
       const base = grouped.get(wo)?.get(code);
       const isSCXR = (base?.group || '') === 'SCXR';
-      for (const a of state.allocations) {
-        const v = state.assets[a.id];
-        const assetId = typeof v === 'object' ? v.assetId : v;
-        if (!assetId) issues.push(`Missing Asset ID on [${code}] for allocation ${a.id}.`);
-        if (isSCXR) {
-          const meta = typeof v === 'object'
-            ? v
-            : { assetId: v ?? "", coeLoc: "", rackBay: "", sepcat: "" };
-          const missing = [];
-          if (!meta.coeLoc)  missing.push("COE LOC");
-          if (!meta.rackBay) missing.push("RACK/BAY");
-          if (!meta.sepcat)  missing.push("SEPCAT");
-          if (missing.length) {
-            issues.push(`SCXR requires ${missing.join(", ")} on [${code}] allocation ${a.id}.`);
-          }
-        }
+    for (const a of state.allocations) {
+      if (!isSCXR) continue;
+      const v = state.assets[a.id];
+      const meta = typeof v === 'object'
+        ? v
+        : { assetId: v ?? "", coeLoc: "", rackBay: "", sepcat: "" };
+      const missing = [];
+      if (!meta.assetId) missing.push("Asset ID");
+      if (!meta.coeLoc)  missing.push("COE LOC");
+      if (!meta.rackBay) missing.push("RACK/BAY");
+      if (!meta.sepcat)  missing.push("SEPCAT");
+      if (missing.length) {
+        issues.push(`SCXR requires ${missing.join(", ")} on [${code}] allocation ${a.id}.`);
       }
+    }
     }
 
     if (issues.length) {
