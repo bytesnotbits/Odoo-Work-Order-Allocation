@@ -7,7 +7,7 @@ import { isMiscProductCode, MISC_PRODUCT_CODE, MISC_PRODUCT_PREFIX } from "../li
 
 export default function WOView({
   wo, grouped, baseGrouped, getItemState, upsertAllocation, removeAllocation,
-  setAssetMeta, setReelSpan, removeReelSpan, getReelSpan, listReels, lockWorkOrder, tab, allocState, setCableMode,
+  setAssetMeta, setReelSpan, removeReelSpan, getReelSpan, listReels, getReelSpanMap, lockWorkOrder, tab, allocState, setCableMode,
   addReelAllocation, updateAllocation,
   addMiscEntry, removeMiscEntry, nextMiscCode,
 }) {
@@ -140,6 +140,7 @@ export default function WOView({
           removeReelSpan={removeReelSpan}
           getReelSpan={getReelSpan}
           listReels={listReels}
+          getReelSpanMap={getReelSpanMap}
           setCableMode={setCableMode}
           addReelAllocation={addReelAllocation}
           updateAllocation={updateAllocation}

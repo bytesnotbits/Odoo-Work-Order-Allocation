@@ -25,6 +25,7 @@ const baseProps = {
   removeReelSpan: vi.fn(),
   getReelSpan: () => ({ start: '', end: '' }),
   listReels: () => [],
+  getReelSpanMap: () => ({}),
   addReelAllocation: vi.fn(),
   updateAllocation: vi.fn(),
 };

@@ -13,7 +13,7 @@ const baseProps = {
   getItemState: () => ({ base:{}, extra:{ allocations:[{id:'X', type:'regular', qty:1}] , assets:{} }, totalAvailable:1, allocatedSum:1, remaining:0 }),
   upsertAllocation: vi.fn(), removeAllocation: vi.fn(),
   setAssetId: vi.fn(), setAssetMeta: vi.fn(),
-  setReelSpan: vi.fn(), removeReelSpan: vi.fn(), getReelSpan: () => ({start:'', end:''}), listReels: () => [],
+  setReelSpan: vi.fn(), removeReelSpan: vi.fn(), getReelSpan: () => ({start:'', end:''}), listReels: () => [], getReelSpanMap: () => ({}),
   addReelAllocation: vi.fn(),
   updateAllocation: vi.fn(),
   locked:false

@@ -5,6 +5,7 @@ import {
   collectReelIntervals,
   normalizeReelBounds,
   isPendingAllocation,
+  normalizeSerialKey,
 } from "../lib/reelSpans";
 import Badge from "./Badge";
 import { Plus, Trash2, Ruler } from "lucide-react";
@@ -17,7 +18,7 @@ const ASSET_META_SUPPRESSED_CATEGORIES = new Set(["pending", "returned", "expens
 export default function ProductCard({
   wo, product, getItemState,
   upsertAllocation, removeAllocation, setAssetMeta,
-  setReelSpan, removeReelSpan, getReelSpan, listReels, setCableMode, addReelAllocation, updateAllocation, tab, locked,
+  setReelSpan, removeReelSpan, getReelSpan, listReels, getReelSpanMap, setCableMode, addReelAllocation, updateAllocation, tab, locked,
   isMiscRemovable = false, onRemoveMisc
 }) {
   // Avoid throwing in test environment where window.alert is "not implemented"
@@ -92,51 +93,82 @@ export default function ProductCard({
   const [reelSerial, setReelSerial] = useState("");
   const [spanStartInput, setSpanStartInput] = useState("");
   const [spanEndInput, setSpanEndInput] = useState("");
+  const [selectedSpanId, setSelectedSpanId] = useState("");
   const [selectedAllocation, setSelectedAllocation] = useState(null);
 
   if (!base) return null;
 
   const reelFootage = Math.abs((Number(inner) || 0) - (Number(outer) || 0));
+  const reelSpanMap = getReelSpanMap(wo, product.code);
   const knownReels = listReels(wo, product.code);
-  const currentSpan = reelSerial ? getReelSpan(wo, product.code, reelSerial) : { start: "", end: "" };
-  const spanStartNum = isFinite(Number(currentSpan.start)) ? Number(currentSpan.start) : null;
-  const spanEndNum = isFinite(Number(currentSpan.end)) ? Number(currentSpan.end) : null;
+  const fallbackSpan = reelSerial ? getReelSpan(wo, product.code, reelSerial) : null;
+  const activeSpan = selectedSpanId
+    ? getReelSpan(wo, product.code, reelSerial, selectedSpanId)
+    : fallbackSpan;
+  const spanStartNum = isFinite(Number(activeSpan?.start)) ? Number(activeSpan.start) : null;
+  const spanEndNum = isFinite(Number(activeSpan?.end)) ? Number(activeSpan.end) : null;
   const spanMin = spanStartNum !== null && spanEndNum !== null ? Math.min(spanStartNum, spanEndNum) : null;
   const spanMax = spanStartNum !== null && spanEndNum !== null ? Math.max(spanStartNum, spanEndNum) : null;
   const handleSelectReel = (serial) => {
-    const span = getReelSpan(wo, product.code, serial);
+    const spans = reelSpanMap[serial] || [];
     setReelSerial(serial);
-    setSpanStartInput(formatSpanInput(span?.start));
-    setSpanEndInput(formatSpanInput(span?.end));
-    setOuter(formatSpanInput(span?.start));
-    setInner(formatSpanInput(span?.end));
+    if (spans.length > 0) {
+      const lastSpan = spans[spans.length - 1];
+      setSelectedSpanId(lastSpan.id);
+      setSpanStartInput(formatSpanInput(lastSpan.start));
+      setSpanEndInput(formatSpanInput(lastSpan.end));
+      setOuter(formatSpanInput(lastSpan.start));
+      setInner(formatSpanInput(lastSpan.end));
+      return;
+    }
+    setSelectedSpanId("");
+    setSpanStartInput("");
+    setSpanEndInput("");
+    setOuter("");
+    setInner("");
+  };
+  const handleSelectSpan = (serial, span) => {
+    setReelSerial(serial);
+    setSelectedSpanId(span.id);
+    setSpanStartInput(formatSpanInput(span.start));
+    setSpanEndInput(formatSpanInput(span.end));
+    setOuter(formatSpanInput(span.start));
+    setInner(formatSpanInput(span.end));
   };
   const handleRemoveReel = (serial) => {
+    const spans = reelSpanMap[serial] || [];
+    spans.forEach((span) => {
+      extra.allocations
+        .filter(
+          (alloc) =>
+            alloc.type === "reel" &&
+            normalizeSerialKey(alloc.reelSerial) === normalizeSerialKey(serial) &&
+            alloc.spanId === span.id,
+        )
+        .forEach((alloc) => removeAllocation(wo, product.code, alloc.id));
+    });
     removeReelSpan(wo, product.code, serial);
     if (serial === reelSerial) {
       setReelSerial("");
       setSpanStartInput("");
       setSpanEndInput("");
+      setSelectedSpanId("");
     }
   };
   const reelSpanSummaries = knownReels.map((serial) => {
-    const span = getReelSpan(wo, product.code, serial);
-    const s = Number(span?.start);
-    const e = Number(span?.end);
-    if (!isFinite(s) || !isFinite(e)) {
-      return { serial, hasSpan: false };
-    }
-    const total = Math.abs(e - s);
+    const spans = reelSpanMap[serial] || [];
+    if (spans.length === 0) return { serial, hasSpan: false };
+    const total = spans.reduce((sum, span) => sum + Math.abs(span.end - span.start), 0);
     const covered = extra.allocations
-      .filter(a => a.type === "reel" && (a.reelSerial || "") === serial && a.outer != null && a.inner != null)
+      .filter((a) => a.type === "reel" && normalizeSerialKey(a.reelSerial) === normalizeSerialKey(serial) && a.outer != null && a.inner != null)
       .reduce((sum, a) => sum + Math.abs(a.outer - a.inner), 0);
     const remainingSpan = Math.max(total - covered, 0);
     return { serial, hasSpan: true, total, covered, remainingSpan };
   });
-  const reelSpanBounds = reelSerial ? normalizeReelBounds(currentSpan.start, currentSpan.end) : null;
-  const missingSegments = reelSpanBounds && reelSerial
+  const spanBounds = reelSerial && activeSpan ? normalizeReelBounds(activeSpan.start, activeSpan.end) : null;
+  const missingSegments = spanBounds
     ? computeSpanGaps(
-        reelSpanBounds,
+        spanBounds,
         collectReelIntervals(extra.allocations, reelSerial, (alloc) => !isPendingAllocation(alloc)),
       )
     : [];
@@ -158,6 +190,8 @@ export default function ProductCard({
     allocCategory === "__custom__" ? (allocCategoryCustom || "Custom") : allocCategory;
   const isCustomCategory = () => allocCategory === "__custom__";
   const isReturnCategory = (category) => ["Returned", "Pending"].includes(category);
+  const isPendingCategory = (category) =>
+    String(category || "").trim().toLowerCase() === DEFAULT_PENDING_CATEGORY.toLowerCase();
   const buildRegularPayload = (qty, categoryName) => ({
     type: "regular",
     qty,
@@ -269,24 +303,24 @@ export default function ProductCard({
     setSelectedAllocation(null);
   }
 
-  const normalizeSerialKey = (value) => String(value || "").trim().toLowerCase();
-  const syncPendingAllocationsForSpan = (serialToUse, spanBounds) => {
-    if (!addReelAllocation || !serialToUse || !spanBounds) return;
-    const accountedIntervals = collectReelIntervals(
-      extra.allocations,
-      serialToUse,
-      (alloc) => !isPendingAllocation(alloc),
-    );
-    const gaps = computeSpanGaps(spanBounds, accountedIntervals);
+  const syncPendingAllocationsForSpan = (serialToUse, span) => {
+    if (!addReelAllocation || !serialToUse || !span) return;
     const normalizedSerial = normalizeSerialKey(serialToUse);
     const pendingIds = extra.allocations
       .filter((alloc) => (
         alloc.type === "reel" &&
         normalizeSerialKey(alloc.reelSerial) === normalizedSerial &&
-        isPendingAllocation(alloc)
+        isPendingAllocation(alloc) &&
+        alloc.spanId === span.id
       ))
       .map((alloc) => alloc.id);
     pendingIds.forEach((id) => removeAllocation(wo, product.code, id));
+    const accountedIntervals = collectReelIntervals(
+      extra.allocations,
+      serialToUse,
+      (alloc) => !isPendingAllocation(alloc),
+    );
+    const gaps = computeSpanGaps(span, accountedIntervals);
     for (const gap of gaps) {
       const result = addReelAllocation(wo, product.code, {
         type: "reel",
@@ -296,6 +330,7 @@ export default function ProductCard({
         allocationCategory: DEFAULT_PENDING_CATEGORY,
         allocationCategoryIsCustom: false,
         reelSerial: serialToUse,
+        spanId: span.id,
       });
       if (result?.error) {
         safeAlert(result.error);
@@ -310,10 +345,27 @@ export default function ProductCard({
     const startValue = Number(spanStartInput);
     const endValue = Number(spanEndInput);
     if (!isFinite(startValue) || !isFinite(endValue)) return safeAlert("Enter numeric span start/end");
-    const normalizedSpan = normalizeReelBounds(startValue, endValue);
-    if (!normalizedSpan) return safeAlert("Span start and end must differ");
-    setReelSpan(wo, product.code, reelSerial, startValue, endValue);
-    syncPendingAllocationsForSpan(trimmedSerial, normalizedSpan);
+    const savedSpan = selectedSpanId
+      ? setReelSpan(wo, product.code, trimmedSerial, startValue, endValue, { spanId: selectedSpanId })
+      : setReelSpan(wo, product.code, trimmedSerial, startValue, endValue);
+    if (!savedSpan) return safeAlert("Span start and end must differ");
+    setReelSerial(trimmedSerial);
+    setSelectedSpanId(savedSpan.id);
+    setSpanStartInput(formatSpanInput(savedSpan.start));
+    setSpanEndInput(formatSpanInput(savedSpan.end));
+    syncPendingAllocationsForSpan(trimmedSerial, savedSpan);
+  };
+
+  const handleRevertToPending = (alloc) => {
+    if (!alloc || isPendingCategory(alloc.allocationCategory)) return;
+    if (typeof updateAllocation === "function") {
+      updateAllocation(wo, product.code, alloc.id, {
+        allocationCategory: DEFAULT_PENDING_CATEGORY,
+        allocationCategoryIsCustom: false,
+      });
+    } else {
+      removeAllocation(wo, product.code, alloc.id);
+    }
   };
 
   const defaultCategory = ALLOCATION_OPTIONS[0] || "";
@@ -489,38 +541,73 @@ export default function ProductCard({
                   <div className="grid md:grid-cols-3 gap-2">
                     <div>
                       <label className="block text-sm">Reel/Serial Number</label>
-                      <input className="w-full border rounded-xl p-2" value={reelSerial} onChange={(e)=> setReelSerial(e.target.value)} placeholder="REEL-XXXXX" />
+                      <input
+                        className="w-full border rounded-xl p-2"
+                        value={reelSerial}
+                        onChange={(e) => {
+                          setReelSerial(e.target.value);
+                          setSelectedSpanId("");
+                        }}
+                        placeholder="REEL-XXXXX"
+                      />
                       {knownReels.length > 0 && (
                         <div className="text-xs text-gray-600 mt-1">
-                          <div className="text-[11px] uppercase tracking-wide mb-1 text-slate-500">Known reels</div>
-                          <div className="flex flex-wrap gap-2">
-                            {knownReels.map((serial) => (
-                              <div key={serial} className="flex items-center gap-1">
-                                <button
-                                  type="button"
-                                  className={[
-                                    "px-2 py-1 rounded-full border text-[11px] transition",
-                                    serial === reelSerial
-                                      ? "bg-slate-900 text-white border-slate-900"
-                                      : "bg-white text-slate-900 border-slate-200 hover:bg-slate-50"
-                                  ].join(" ")}
-                                  onClick={() => handleSelectReel(serial)}
-                                >
-                                  {serial}
-                                </button>
-                                <button
-                                  type="button"
-                                  className="flex items-center justify-center w-5 h-5 rounded-full border border-red-200 text-red-600 text-[10px] bg-white hover:bg-red-50"
-                                  aria-label={`Remove reel ${serial}`}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleRemoveReel(serial);
-                                  }}
-                                >
-                                  ×
-                                </button>
-                              </div>
-                            ))}
+                          <div className="text-[11px] uppercase tracking-wide mb-1 text-slate-500">Known reels & spans</div>
+                          <div className="space-y-2">
+                            {knownReels.map((serial) => {
+                              const spans = reelSpanMap[serial] || [];
+                              return (
+                                <div key={serial} className="space-y-1">
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <button
+                                      type="button"
+                                      className={[
+                                        "px-2 py-1 rounded-full border text-[11px] transition",
+                                        serial === reelSerial
+                                          ? "bg-slate-900 text-white border-slate-900"
+                                          : "bg-white text-slate-900 border-slate-200 hover:bg-slate-50"
+                                      ].join(" ")}
+                                      onClick={() => handleSelectReel(serial)}
+                                    >
+                                      {serial}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="flex items-center justify-center w-5 h-5 rounded-full border border-red-200 text-red-600 text-[10px] bg-white hover:bg-red-50"
+                                      aria-label={`Remove reel ${serial}`}
+                                      onClick={(event) => {
+                                        event.stopPropagation();
+                                        handleRemoveReel(serial);
+                                      }}
+                                    >
+                                      ×
+                                    </button>
+                                  </div>
+                                  {spans.length > 0 && (
+                                    <div className="flex flex-wrap gap-2">
+                                      {spans.map((span) => {
+                                        const isActiveSpan = span.id === selectedSpanId;
+                                        return (
+                                          <button
+                                            type="button"
+                                            key={span.id}
+                                            className={[
+                                              "px-2 py-1 rounded-full border text-[11px] transition",
+                                              isActiveSpan
+                                                ? "bg-slate-900 text-white border-slate-900"
+                                                : "bg-white text-slate-900 border-slate-200 hover:bg-slate-50"
+                                            ].join(" ")}
+                                            onClick={() => handleSelectSpan(serial, span)}
+                                          >
+                                            [{span.start}–{span.end}]
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
                       )}
@@ -560,7 +647,7 @@ export default function ProductCard({
                     ))}
                   </div>
                 )}
-                {reelSpanBounds && (
+                {spanBounds && (
                   <div className="mt-3 text-sm">
                     {missingSegments.length === 0 ? (
                       <div className="text-emerald-700 font-semibold">Span fully accounted for</div>
@@ -590,7 +677,15 @@ export default function ProductCard({
                 <div className="grid md:grid-cols-3 gap-2">
                   <div>
                     <label className="block text-sm">Reel/Serial Number <span className="text-red-500">*</span></label>
-                    <input className="w-full border rounded-xl p-2" value={reelSerial} onChange={(e) => setReelSerial(e.target.value)} placeholder="REEL-XXXXX" />
+                    <input
+                      className="w-full border rounded-xl p-2"
+                      value={reelSerial}
+                      onChange={(e) => {
+                        setReelSerial(e.target.value);
+                        setSelectedSpanId("");
+                      }}
+                      placeholder="REEL-XXXXX"
+                    />
                   </div>
                   <div>
                     <label className="block text-sm">Inner Seq</label>
@@ -627,7 +722,7 @@ export default function ProductCard({
             ) : (
               <div className="space-y-3">
                 {extra.allocations.map((a) => {
-                const isPendingReturn = a.allocationCategory === "Pending";
+                const isPendingReturn = isPendingCategory(a.allocationCategory);
                 const isReturned = a.allocationCategory === "Returned";
                 const raw = (extra.assets && extra.assets[a.id]) || {};
                 const meta = typeof raw === "object"
@@ -676,14 +771,15 @@ export default function ProductCard({
                         {!locked && (
                           <button
                             type="button"
-                            className="inline-flex items-center justify-center px-2 py-1 rounded border text-sm"
+                            className="inline-flex items-center justify-center px-3 py-1 rounded-full border text-[11px] font-semibold uppercase tracking-wide transition"
                             onClick={(event) => {
                               event.stopPropagation();
-                              removeAllocation(wo, product.code, a.id);
+                              handleRevertToPending(a);
                             }}
-                            aria-label="Remove allocation"
+                            aria-label="Revert allocation to pending"
+                            disabled={isPendingReturn}
                           >
-                            ✕
+                            {isPendingReturn ? "Pending" : "Revert to pending"}
                           </button>
                         )}
                       </div>

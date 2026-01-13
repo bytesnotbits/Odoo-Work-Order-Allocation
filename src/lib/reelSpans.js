@@ -1,4 +1,4 @@
-const normalizeSerialKey = (value) => String(value || "").trim().toLowerCase();
+export const normalizeSerialKey = (value) => String(value || "").trim().toLowerCase();
 
 export function normalizeReelBounds(outer, inner) {
   const o = Number(outer);

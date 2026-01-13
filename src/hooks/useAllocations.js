@@ -9,10 +9,67 @@ export function useAllocations(grouped) {
 
   const keyOf = (wo, code) => `${wo}|${code}`;
 
+  const normalizeSerial = (value) => String(value || "").trim();
+
+  const normalizeReelSpan = (span) => {
+    const bounds = normalizeReelBounds(span?.start ?? span?.outer, span?.end ?? span?.inner);
+    if (!bounds) return null;
+    return {
+      id: span?.id || span?.spanId || uid(),
+      start: bounds.start,
+      end: bounds.end,
+    };
+  };
+
+  const normalizeReelSpanRecords = (reels = {}) => {
+    const normalized = {};
+    if (!reels || typeof reels !== "object") return normalized;
+    for (const [serial, value] of Object.entries(reels)) {
+      const key = normalizeSerial(serial);
+      if (!key) continue;
+      const spans = [];
+      if (Array.isArray(value)) {
+        for (const span of value) {
+          const normalizedSpan = normalizeReelSpan(span);
+          if (normalizedSpan) spans.push(normalizedSpan);
+        }
+      } else if (value && typeof value === "object") {
+        const normalizedSpan = normalizeReelSpan(value);
+        if (normalizedSpan) spans.push(normalizedSpan);
+      }
+      if (spans.length > 0) {
+        normalized[key] = spans;
+      }
+    }
+    return normalized;
+  };
+
+  const buildReelState = (input) => ({
+    allocations: input.allocations || [],
+    assets: input.assets || {},
+    locked: input.locked || false,
+    reels: input.reels || {},
+    coe: input.coe || {},
+    cableMode: input.cableMode || false,
+  });
+
+  const getReelSpanMap = (wo, code) => {
+    const k = keyOf(wo, code);
+    const rec = allocState[k] || {};
+    return normalizeReelSpanRecords(rec.reels || {});
+  };
+
+  const listReelSpans = (wo, code, reelSerial) => {
+    const spans = getReelSpanMap(wo, code);
+    const serialKey = normalizeSerial(reelSerial);
+    if (!serialKey) return [];
+    return spans[serialKey] || [];
+  };
+
   const getItemState = (wo, code) => {
     const base = grouped.get(wo)?.get(code);
     const k = keyOf(wo, code);
-    const extra = allocState[k] || { allocations: [], assets: {}, reels: {}, coe: {}, locked: false, cableMode: false };
+    const extra = buildReelState(allocState[k] || {});
     const isMisc = isMiscProductCode(code);
     const posted = base?.posted || 0;
     const returned = base?.returned || 0;
@@ -81,7 +138,7 @@ export function useAllocations(grouped) {
   const upsertAllocation = (wo, code, alloc) => {
     setAllocState(prev => {
       const k = keyOf(wo, code);
-      const cur = prev[k] || { allocations: [], assets: {}, locked: false, reels: {}, coe: {}, cableMode: false };
+      const cur = buildReelState(prev[k] || {});
       return { ...prev, [k]: { ...cur, allocations: [...cur.allocations, { id: uid(), ...alloc }] } };
     });
   };
@@ -89,7 +146,7 @@ export function useAllocations(grouped) {
   const removeAllocation = (wo, code, id) => {
     setAllocState(prev => {
       const k = keyOf(wo, code);
-      const cur = prev[k] || { allocations: [], assets: {}, locked: false, reels: {}, coe: {}, cableMode: false };
+      const cur = buildReelState(prev[k] || {});
       const { [id]: _, ...restCoe } = cur.coe || {};
       return { ...prev, [k]: { ...cur, allocations: cur.allocations.filter(a => a.id !== id), coe: restCoe } };
     });
@@ -99,7 +156,7 @@ export function useAllocations(grouped) {
   const setAssetId = (wo, code, allocId, assetId) => {
     setAllocState(prev => {
       const k = keyOf(wo, code);
-      const cur = prev[k] || { allocations: [], assets: {}, locked: false, reels: {}, cableMode: false };
+      const cur = buildReelState(prev[k] || {});
       const prevMeta = cur.assets?.[allocId];
       const meta = typeof prevMeta === 'object'
         ? { ...prevMeta, assetId }
@@ -112,7 +169,7 @@ export function useAllocations(grouped) {
   const setAssetMeta = (wo, code, allocId, fields) => {
     setAllocState(prev => {
       const k = keyOf(wo, code);
-      const cur = prev[k] || { allocations: [], assets: {}, locked: false, reels: {}, cableMode: false };
+      const cur = buildReelState(prev[k] || {});
       const prevMeta = cur.assets?.[allocId];
       const base = (typeof prevMeta === 'object')
         ? prevMeta
@@ -122,36 +179,78 @@ export function useAllocations(grouped) {
   };
 
   // Reel spans
-  const setReelSpan = (wo, code, reelSerial, start, end) => {
+  const setReelSpan = (wo, code, reelSerial, start, end, options = {}) => {
+    const normalizedSerial = normalizeSerial(reelSerial);
+    if (!normalizedSerial) return null;
+    const bounds = normalizeReelBounds(start, end);
+    if (!bounds) return null;
+    const spanId = options.spanId || uid();
+    const newSpan = { id: spanId, start: bounds.start, end: bounds.end };
     setAllocState(prev => {
       const k = keyOf(wo, code);
-      const cur = prev[k] || { allocations: [], assets: {}, locked: false, reels: {}, cableMode: false };
-      return { ...prev, [k]: { ...cur, reels: { ...(cur.reels || {}), [reelSerial]: { start, end } } } };
+      const cur = buildReelState(prev[k] || {});
+      const normalized = normalizeReelSpanRecords(cur.reels);
+      const existing = normalized[normalizedSerial] || [];
+      const updated = options.spanId
+        ? existing.map((span) => (span.id === spanId ? newSpan : span))
+        : [...existing, newSpan];
+      return {
+        ...prev,
+        [k]: {
+          ...cur,
+          reels: {
+            ...normalized,
+            [normalizedSerial]: updated,
+          },
+        },
+      };
     });
+    return newSpan;
   };
   const removeReelSpan = (wo, code, reelSerial) => {
+    const normalizedSerial = normalizeSerial(reelSerial);
+    if (!normalizedSerial) return;
     setAllocState(prev => {
       const k = keyOf(wo, code);
-      const cur = prev[k] || { allocations: [], assets: {}, locked: false, reels: {}, cableMode: false };
-      const { [reelSerial]: _, ...remaining } = cur.reels || {};
+      const cur = buildReelState(prev[k] || {});
+      const normalized = normalizeReelSpanRecords(cur.reels);
+      if (!normalized[normalizedSerial]) return prev;
+      const { [normalizedSerial]: _, ...remaining } = normalized;
       return { ...prev, [k]: { ...cur, reels: remaining } };
     });
   };
-  const getReelSpan = (wo, code, reelSerial) => {
-    const k = keyOf(wo, code);
-    const rec = allocState[k] || {};
-    return (rec.reels && rec.reels[reelSerial]) ? rec.reels[reelSerial] : { start: "", end: "" };
+
+  const removeReelSpanEntry = (wo, code, reelSerial, spanId) => {
+    const normalizedSerial = normalizeSerial(reelSerial);
+    if (!normalizedSerial || !spanId) return;
+    setAllocState(prev => {
+      const k = keyOf(wo, code);
+      const cur = buildReelState(prev[k] || {});
+      const normalized = normalizeReelSpanRecords(cur.reels);
+      const existing = normalized[normalizedSerial] || [];
+      const filtered = existing.filter((span) => span.id !== spanId);
+      if (filtered.length === existing.length) return prev;
+      const updated = filtered.length > 0
+        ? { ...normalized, [normalizedSerial]: filtered }
+        : Object.fromEntries(Object.entries(normalized).filter(([key]) => key !== normalizedSerial));
+      return { ...prev, [k]: { ...cur, reels: updated } };
+    });
   };
-  const listReels = (wo, code) => {
-    const k = keyOf(wo, code);
-    const rec = allocState[k] || {};
-    return Object.keys(rec.reels || {});
+  const getReelSpan = (wo, code, reelSerial, spanId) => {
+    const spans = listReelSpans(wo, code, reelSerial);
+    if (!spans.length) return { start: "", end: "" };
+    if (spanId) {
+      const match = spans.find((span) => span.id === spanId);
+      if (match) return match;
+    }
+    return spans[spans.length - 1];
   };
+  const listReels = (wo, code) => Object.keys(getReelSpanMap(wo, code));
 
   const setCableMode = (wo, code, enabled) => {
     setAllocState(prev => {
       const k = keyOf(wo, code);
-      const cur = prev[k] || { allocations: [], assets: {}, locked: false, reels: {}, coe: {}, cableMode: false };
+      const cur = buildReelState(prev[k] || {});
       return { ...prev, [k]: { ...cur, cableMode: !!enabled } };
     });
   };
@@ -179,7 +278,7 @@ export function useAllocations(grouped) {
     for (const [code] of gm) {
       if (isMiscProductCode(code)) continue;
       const k = keyOf(wo, code);
-      const rec = allocState[k] || { allocations: [], reels: {} };
+      const rec = buildReelState(allocState[k] || {});
       const byReel = {};
       for (const a of rec.allocations) {
         if (a.type !== "reel") continue;
@@ -198,13 +297,15 @@ export function useAllocations(grouped) {
             issues.push(`Overlap on [${code}] reel ${reel}: [${prev[0]}–${prev[1]}] overlaps [${curr[0]}–${curr[1]}].`);
           }
         }
-        const rs = (rec.reels || {})[reel];
-        if (rs && Number.isFinite(Number(rs.start)) && Number.isFinite(Number(rs.end))) {
-          const lo = Math.min(Number(rs.start), Number(rs.end));
-          const hi = Math.max(Number(rs.start), Number(rs.end));
+        const spans = normalizeReelSpanRecords(rec.reels || {})[reel] || [];
+        if (spans.length > 0) {
           for (const [s, e] of intervals) {
-            if (s < lo || e > hi) {
-              issues.push(`Piece outside saved span on [${code}] reel ${reel}: [${s}–${e}] not within [${lo}–${hi}].`);
+            const fits = spans.some(({ start, end }) => s >= start && e <= end);
+            if (!fits) {
+              const spanDesc = spans.map(({ start, end }) => `[${start}–${end}]`).join(" or ");
+              issues.push(
+                `Piece outside saved span on [${code}] reel ${reel}: [${s}–${e}] not within ${spanDesc}.`,
+              );
             }
           }
         }
@@ -215,7 +316,7 @@ export function useAllocations(grouped) {
     for (const [code] of gm) {
       if (isMiscProductCode(code)) continue;
       const k = keyOf(wo, code);
-      const state = allocState[k] || { allocations: [], assets: {} };
+      const state = buildReelState(allocState[k] || {});
       // determine SCXR from grouped data
       const base = grouped.get(wo)?.get(code);
       const isSCXR = (base?.group || '') === 'SCXR';
@@ -326,7 +427,7 @@ export function useAllocations(grouped) {
     }
     const reelSerialKey = (alloc.reelSerial || "");
     const k = keyOf(wo, code);
-    const current = allocState[k] || { allocations: [], assets: {}, locked: false, reels: {}, coe: {}, cableMode: false };
+    const current = buildReelState(allocState[k] || {});
     const replaceId = options.replaceId;
     const { allocations: staged, removedIds } = splitPendingReturnAllocations(
       current.allocations,
@@ -346,7 +447,7 @@ export function useAllocations(grouped) {
       return { error: `Overlap with existing piece [${overlap.previous.start}–${overlap.previous.end}]` };
     }
     setAllocState((prev) => {
-      const cur = prev[k] || { allocations: [], assets: {}, locked: false, reels: {}, coe: {}, cableMode: false };
+      const cur = buildReelState(prev[k] || {});
       const adjustedAssets = { ...cur.assets };
       const adjustedCoe = { ...(cur.coe || {}) };
       for (const id of removedIds) {
@@ -372,7 +473,8 @@ export function useAllocations(grouped) {
       const k = keyOf(wo, code);
       const cur = prev[k];
       if (!cur) return prev;
-      const allocations = cur.allocations.map((a) =>
+      const normalized = buildReelState(cur);
+      const allocations = normalized.allocations.map((a) =>
         a.id === allocId ? { ...a, ...fields } : a
       );
       return { ...prev, [k]: { ...cur, allocations } };
@@ -393,8 +495,11 @@ export function useAllocations(grouped) {
     removeReelSpan,
     getReelSpan,
     listReels,
+    getReelSpanMap,
+    listReelSpans,
     lockWorkOrder,
     addReelAllocation,
     updateAllocation,
+    removeReelSpanEntry,
   };
 }

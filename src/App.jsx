@@ -216,6 +216,7 @@ export default function App() {
     removeReelSpan,
     getReelSpan,
     listReels,
+    getReelSpanMap,
     lockWorkOrder,
     setCableMode,
     addReelAllocation,
@@ -827,6 +828,7 @@ export default function App() {
                 removeReelSpan={removeReelSpan}
                 getReelSpan={getReelSpan}
                 listReels={listReels}
+                getReelSpanMap={getReelSpanMap}
                 lockWorkOrder={lockWorkOrder}
                 setCableMode={setCableMode}
                 addReelAllocation={addReelAllocation}

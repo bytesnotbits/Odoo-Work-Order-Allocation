@@ -2,6 +2,14 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ProductCard from '../components/ProductCard.jsx';
 
+beforeEach(() => {
+  vi.spyOn(window, 'alert').mockImplementation(() => {});
+});
+
+afterEach(() => {
+  window.alert.mockRestore?.();
+});
+
 // Mock ALLOCATION_OPTIONS used by the component
 vi.mock('../lib/data', () => ({
       ALLOCATION_OPTIONS: ['Aerial', 'Buried', 'Underground', 'Removal', 'Pending', 'Returned'],
@@ -35,6 +43,7 @@ function renderProductCard(overrides = {}) {
     removeReelSpan: vi.fn(),
     getReelSpan: () => ({ start: '', end: '' }),
     listReels: () => [],
+    getReelSpanMap: () => ({}),
     updateAllocation: vi.fn(),
     addReelAllocation: vi.fn(),
   };
@@ -69,7 +78,7 @@ describe('ProductCard – Add Asset button', () => {
 
 test('saving a new reel span auto-creates a pending allocation', async () => {
   const user = userEvent.setup();
-  const setReelSpan = vi.fn();
+  const setReelSpan = vi.fn().mockReturnValue({ id: "SPAN-1", start: 100, end: 200 });
   const addReelAllocation = vi.fn().mockReturnValue({ success: true });
   renderProductCard({
     getItemState: () => ({
