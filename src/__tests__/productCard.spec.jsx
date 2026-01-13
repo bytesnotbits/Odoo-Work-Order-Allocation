@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ProductCard from '../components/ProductCard.jsx';
 
@@ -65,4 +65,48 @@ describe('ProductCard – Add Asset button', () => {
     // We can’t assert exact call without valid qty; we only assert that the DOM is still alive:
     expect(screen.getByText(/test item/i)).toBeInTheDocument();
   });
+});
+
+test('saving a new reel span auto-creates a pending allocation', async () => {
+  const user = userEvent.setup();
+  const setReelSpan = vi.fn();
+  const addReelAllocation = vi.fn().mockReturnValue({ success: true });
+  renderProductCard({
+    getItemState: () => ({
+      base: {},
+      extra: { allocations: [] },
+      totalAvailable: 100,
+      allocatedSum: 0,
+      remaining: 100,
+      cableMode: true,
+      pendingReturnSum: 0,
+      returnedSum: 0,
+      netAllocated: 0,
+    }),
+    setReelSpan,
+    addReelAllocation,
+  });
+
+  const spanSerialInput = screen.getAllByPlaceholderText("REEL-XXXXX")[0];
+  const spanSection = screen.getByText(/Reel & span \(optional\)/i).parentElement;
+  const [innerInput, outerInput] = within(spanSection).getAllByRole('spinbutton');
+  await user.type(spanSerialInput, "REEL-1");
+  await user.type(innerInput, "100");
+  await user.type(outerInput, "200");
+
+  const saveButton = screen.getByRole('button', { name: /save span/i });
+  await user.click(saveButton);
+
+  expect(setReelSpan).toHaveBeenCalledWith('WO-TEST', 'ITEM-1', 'REEL-1', 100, 200);
+  expect(addReelAllocation).toHaveBeenCalledWith(
+    'WO-TEST',
+    'ITEM-1',
+    expect.objectContaining({
+      type: 'reel',
+      outer: 200,
+      inner: 100,
+      allocationCategory: 'Pending',
+      reelSerial: 'REEL-1',
+    }),
+  );
 });

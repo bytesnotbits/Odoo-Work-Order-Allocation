@@ -3,6 +3,9 @@ import { ALLOCATION_OPTIONS, MISC_PRODUCT_NOTE, isMiscProductCode } from "../lib
 import Badge from "./Badge";
 import { Plus, Trash2, Ruler } from "lucide-react";
 
+const DEFAULT_PENDING_CATEGORY =
+  ALLOCATION_OPTIONS.find((option) => option.toLowerCase() === "pending") || "Pending";
+
 export default function ProductCard({
   wo, product, getItemState,
   upsertAllocation, removeAllocation, setAssetMeta,
@@ -196,6 +199,44 @@ export default function ProductCard({
     setAllocCategoryCustom("");
     setSelectedAllocation(null);
   }
+
+  const hasReelAllocationForSerial = (serialToCheck) => {
+    const normalizedTarget = (serialToCheck || "").trim().toLowerCase();
+    if (!normalizedTarget) return false;
+    return (extra.allocations || []).some((alloc) => {
+      if (alloc.type !== "reel") return false;
+      const existingSerial = (alloc.reelSerial || "").trim().toLowerCase();
+      return existingSerial === normalizedTarget;
+    });
+  };
+
+  const maybeAddPendingAllocationForSpan = (serialToUse, startValue, endValue) => {
+    if (!addReelAllocation) return;
+    if (!serialToUse) return;
+    if (hasReelAllocationForSerial(serialToUse)) return;
+    const result = addReelAllocation(wo, product.code, {
+      type: "reel",
+      outer: endValue,
+      inner: startValue,
+      allocationId: "",
+      allocationCategory: DEFAULT_PENDING_CATEGORY,
+      allocationCategoryIsCustom: false,
+      reelSerial: serialToUse,
+    });
+    if (result?.error) {
+      safeAlert(result.error);
+    }
+  };
+
+  const handleSaveSpan = () => {
+    const trimmedSerial = (reelSerial || "").trim();
+    if (!trimmedSerial) return safeAlert("Enter reel/serial to save a span");
+    const startValue = Number(spanStartInput);
+    const endValue = Number(spanEndInput);
+    if (!isFinite(startValue) || !isFinite(endValue)) return safeAlert("Enter numeric span start/end");
+    setReelSpan(wo, product.code, reelSerial, startValue, endValue);
+    maybeAddPendingAllocationForSpan(reelSerial, startValue, endValue);
+  };
 
   const defaultCategory = ALLOCATION_OPTIONS[0] || "";
   const handleSelectAllocation = (alloc) => {
@@ -415,14 +456,11 @@ export default function ProductCard({
                       <input type="number" className="w-full border rounded-xl p-2" value={spanEndInput} onChange={(e)=>setSpanEndInput(e.target.value)} />
                     </div>
                   </div>
-                  <div className="mt-2">
-                    <button disabled={locked} onClick={()=>{
-                    if (!reelSerial) return safeAlert("Enter reel/serial to save a span");
-                      const s = Number(spanStartInput); const e = Number(spanEndInput);
-                    if (!isFinite(s) || !isFinite(e)) return safeAlert("Enter numeric span start/end");
-                      setReelSpan(wo, product.code, reelSerial, s, e);
-                    }} className={primaryButton + " px-3 py-1"}>Save span</button>
-                  </div>
+    <div className="mt-2">
+      <button disabled={locked} onClick={handleSaveSpan} className={primaryButton + " px-3 py-1"}>
+        Save span
+      </button>
+    </div>
                   {/* Coverage summary */}
                   {knownReels.length === 0 ? (
                     <div className="text-sm text-gray-500 mt-2">No spans saved for this product yet.</div>
