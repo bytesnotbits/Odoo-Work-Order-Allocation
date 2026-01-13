@@ -6,6 +6,8 @@ import { Plus, Trash2, Ruler } from "lucide-react";
 const DEFAULT_PENDING_CATEGORY =
   ALLOCATION_OPTIONS.find((option) => option.toLowerCase() === "pending") || "Pending";
 
+const ASSET_META_SUPPRESSED_CATEGORIES = new Set(["pending", "returned", "expense"]);
+
 export default function ProductCard({
   wo, product, getItemState,
   upsertAllocation, removeAllocation, setAssetMeta,
@@ -534,6 +536,9 @@ export default function ProductCard({
                 const meta = typeof raw === "object"
                   ? raw
                   : { assetId: raw ?? "", coeLoc: "", rackBay: "", sepcat: "" };
+                const categoryNormalized = (a.allocationCategory ?? "").trim().toLowerCase();
+                const isCustomAllocation = Boolean(a.allocationCategoryIsCustom) || categoryNormalized === "custom";
+                const shouldHideAssetFields = isCustomAllocation || ASSET_META_SUPPRESSED_CATEGORIES.has(categoryNormalized);
                 const numericValue = a.type === "reel" ? a.footage : a.qty;
                 const outerValue = a.type === "reel" ? (a.outer ?? "—") : "—";
                 const innerValue = a.type === "reel" ? (a.inner ?? "—") : "—";
@@ -610,12 +615,10 @@ export default function ProductCard({
                           </span>
                         </div>
                       )}
-                      <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                        <div>
-                          <div className="text-xs font-medium text-slate-500 uppercase tracking-wide">Asset ID</div>
-                          {isPendingReturn ? (
-                            <div className="text-xs text-yellow-700 uppercase tracking-wide">Info only</div>
-                          ) : (
+                      {!shouldHideAssetFields && (
+                        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                          <div>
+                            <div className="text-xs font-medium text-slate-500 uppercase tracking-wide">Asset ID</div>
                             <input
                               className={inputBase}
                               placeholder="Asset ID"
@@ -623,13 +626,9 @@ export default function ProductCard({
                               onChange={(e) => setAssetMeta(wo, product.code, a.id, { assetId: e.target.value })}
                               onMouseDown={(event) => event.stopPropagation()}
                             />
-                          )}
-                        </div>
-                        <div>
-                          <div className="text-xs font-medium text-slate-500 uppercase tracking-wide">COE LOC</div>
-                          {isPendingReturn ? (
-                            <div className="text-xs text-yellow-700 uppercase tracking-wide">Info only</div>
-                          ) : (
+                          </div>
+                          <div>
+                            <div className="text-xs font-medium text-slate-500 uppercase tracking-wide">COE LOC</div>
                             <input
                               className={inputBase}
                               placeholder="COE LOC"
@@ -637,13 +636,9 @@ export default function ProductCard({
                               onChange={(e) => setAssetMeta(wo, product.code, a.id, { coeLoc: e.target.value })}
                               onMouseDown={(event) => event.stopPropagation()}
                             />
-                          )}
-                        </div>
-                        <div>
-                          <div className="text-xs font-medium text-slate-500 uppercase tracking-wide">Rack/Bay</div>
-                          {isPendingReturn ? (
-                            <div className="text-xs text-yellow-700 uppercase tracking-wide">Info only</div>
-                          ) : (
+                          </div>
+                          <div>
+                            <div className="text-xs font-medium text-slate-500 uppercase tracking-wide">Rack/Bay</div>
                             <input
                               className={inputBase}
                               placeholder="RACK/BAY"
@@ -651,13 +646,9 @@ export default function ProductCard({
                               onChange={(e) => setAssetMeta(wo, product.code, a.id, { rackBay: e.target.value })}
                               onMouseDown={(event) => event.stopPropagation()}
                             />
-                          )}
-                        </div>
-                        <div>
-                          <div className="text-xs font-medium text-slate-500 uppercase tracking-wide">SEPCAT</div>
-                          {isPendingReturn ? (
-                            <div className="text-xs text-yellow-700 uppercase tracking-wide">Info only</div>
-                          ) : (
+                          </div>
+                          <div>
+                            <div className="text-xs font-medium text-slate-500 uppercase tracking-wide">SEPCAT</div>
                             <input
                               className={inputBase}
                               placeholder="SEPCAT"
@@ -665,9 +656,9 @@ export default function ProductCard({
                               onChange={(e) => setAssetMeta(wo, product.code, a.id, { sepcat: e.target.value })}
                               onMouseDown={(event) => event.stopPropagation()}
                             />
-                          )}
+                          </div>
                         </div>
-                      </div>
+                      )}
                     </div>
                   );
                 })}
@@ -702,6 +693,9 @@ export default function ProductCard({
                 {extra.allocations.map((a) => {
                   const meta = (extra.assets && extra.assets[a.id]) || {};
                   const assetMeta = typeof meta === 'object' ? meta : { assetId: meta ?? '', coeLoc: '', rackBay: '', sepcat: '' };
+                  const categoryNormalized = (a.allocationCategory ?? "").trim().toLowerCase();
+                  const isCustomAllocation = Boolean(a.allocationCategoryIsCustom) || categoryNormalized === "custom";
+                  const shouldHideAssetFields = isCustomAllocation || ASSET_META_SUPPRESSED_CATEGORIES.has(categoryNormalized);
                   return (<tr key={a.id} className="border-t">
                     <td className="py-1 pr-3">{a.type}</td>
                     <td className="py-1 pr-3">{a.type === "reel" ? a.footage : a.qty}</td>
@@ -711,25 +705,41 @@ export default function ProductCard({
                     <td className="py-1 pr-3">{a.allocationCategory || ""}</td>
                     <td className="py-1 pr-3">{a.reelSerial || ""}</td>
                     <td className="py-1 pr-3">
-                      <input className="border rounded-lg p-1 w-40" placeholder="Asset ID"
-                        value={assetMeta.assetId || ''}
-                        onChange={(e) => setAssetMeta(wo, product.code, a.id, { assetId: e.target.value })} />
+                      {shouldHideAssetFields ? (
+                        <span className="text-slate-400">—</span>
+                      ) : (
+                        <input className="border rounded-lg p-1 w-40" placeholder="Asset ID"
+                          value={assetMeta.assetId || ''}
+                          onChange={(e) => setAssetMeta(wo, product.code, a.id, { assetId: e.target.value })} />
+                      )}
                     </td>
                     <td className="py-1 pr-3">
-                      <input className="border rounded-lg p-1 w-32" placeholder="COE LOC"
-                        value={assetMeta.coeLoc || ''}
-                        onChange={(e) => setAssetMeta(wo, product.code, a.id, { coeLoc: e.target.value })} />
+                      {shouldHideAssetFields ? (
+                        <span className="text-slate-400">—</span>
+                      ) : (
+                        <input className="border rounded-lg p-1 w-32" placeholder="COE LOC"
+                          value={assetMeta.coeLoc || ''}
+                          onChange={(e) => setAssetMeta(wo, product.code, a.id, { coeLoc: e.target.value })} />
+                      )}
                     </td>
                     <td className="py-1 pr-3">
-                      <input className="border rounded-lg p-1 w-32" placeholder="RACK/BAY"
-                        value={assetMeta.rackBay || ''}
-                        onChange={(e) => setAssetMeta(wo, product.code, a.id, { rackBay: e.target.value })} />
+                      {shouldHideAssetFields ? (
+                        <span className="text-slate-400">—</span>
+                      ) : (
+                        <input className="border rounded-lg p-1 w-32" placeholder="RACK/BAY"
+                          value={assetMeta.rackBay || ''}
+                          onChange={(e) => setAssetMeta(wo, product.code, a.id, { rackBay: e.target.value })} />
+                      )}
                     </td>
                     <td className="py-1 pr-3">
-                      <input className="border rounded-lg p-1 w-28" placeholder="SEPCAT"
-                        value={assetMeta.sepcat || ''}
-                        onChange={(e) => setAssetMeta(wo, product.code, a.id, { sepcat: e.target.value })} />
-                     </td>
+                      {shouldHideAssetFields ? (
+                        <span className="text-slate-400">—</span>
+                      ) : (
+                        <input className="border rounded-lg p-1 w-28" placeholder="SEPCAT"
+                          value={assetMeta.sepcat || ''}
+                          onChange={(e) => setAssetMeta(wo, product.code, a.id, { sepcat: e.target.value })} />
+                      )}
+                    </td>
                   </tr>)})}
                </tbody>
              </table>
