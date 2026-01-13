@@ -43,10 +43,14 @@ export function useAllocations(grouped) {
           acc.returned += amount;
           return acc;
         }
+        if (alloc.allocationCategory === "Expense") {
+          acc.expense += amount;
+          return acc;
+        }
         acc.installed += amount;
         return acc;
       },
-      { installed: 0, pending: 0, returned: 0 }
+      { installed: 0, pending: 0, returned: 0, expense: 0 }
     );
 
     const allocatedSum = totals.installed;

@@ -48,6 +48,8 @@ export default function ProductCard({
     setReelSerial(serial);
     setSpanStartInput(formatSpanInput(span?.start));
     setSpanEndInput(formatSpanInput(span?.end));
+    setOuter(formatSpanInput(span?.start));
+    setInner(formatSpanInput(span?.end));
   };
   const handleRemoveReel = (serial) => {
     removeReelSpan(wo, product.code, serial);
