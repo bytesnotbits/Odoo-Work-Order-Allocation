@@ -81,6 +81,8 @@ export default function ProductCard({
     cableMode, cableSuggested
   } = getItemState(wo, product.code);
   const isMiscProduct = isMiscProductCode(product.code);
+  const productGroupLabel = String(product.group || "").trim().toUpperCase();
+  const isScxrProduct = productGroupLabel === "SCXR";
   const [allocQty, setAllocQty] = useState("");
   const [allocId, setAllocId] = useState("");
   const [allocCategory, setAllocCategory] = useState(ALLOCATION_OPTIONS[0]);
@@ -633,7 +635,9 @@ export default function ProductCard({
                   : { assetId: raw ?? "", coeLoc: "", rackBay: "", sepcat: "" };
                 const categoryNormalized = (a.allocationCategory ?? "").trim().toLowerCase();
                 const isCustomAllocation = Boolean(a.allocationCategoryIsCustom) || categoryNormalized === "custom";
-                const shouldHideAssetFields = isCustomAllocation || ASSET_META_SUPPRESSED_CATEGORIES.has(categoryNormalized);
+                const isSuppressedCategory = ASSET_META_SUPPRESSED_CATEGORIES.has(categoryNormalized);
+                const hideAssetFields = isCustomAllocation || isSuppressedCategory;
+                const hideCoeFields = hideAssetFields || !isScxrProduct;
                 const numericValue = a.type === "reel" ? a.footage : a.qty;
                 const outerValue = a.type === "reel" ? (a.outer ?? "—") : "—";
                 const innerValue = a.type === "reel" ? (a.inner ?? "—") : "—";
@@ -711,7 +715,7 @@ export default function ProductCard({
                           </span>
                         </div>
                       )}
-                      {!shouldHideAssetFields && (
+                      {!hideAssetFields && (
                         <div className="mt-3 grid gap-3 sm:grid-cols-2">
                           <div>
                             <div className="text-xs font-medium text-slate-500 uppercase tracking-wide">Asset ID</div>
@@ -738,81 +742,87 @@ export default function ProductCard({
                               )}
                             </div>
                           </div>
-                          <div>
-                            <div className="text-xs font-medium text-slate-500 uppercase tracking-wide">COE LOC</div>
-                            <div className="mt-1 flex items-center gap-2">
-                              <input
-                                className={`${inputBase} flex-1 min-w-0`}
-                                placeholder="COE LOC"
-                                value={meta.coeLoc || ""}
-                                onChange={(e) => setAssetMeta(wo, product.code, a.id, { coeLoc: e.target.value })}
-                                onMouseDown={(event) => event.stopPropagation()}
-                              />
-                              {meta.coeLoc && (
-                                <button
-                                  type="button"
-                                  className={`${copyChipClasses} ${copyChipTruncate}`}
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    copyAssetField("coeLoc", meta.coeLoc, `${a.id}|coeLoc`);
-                                  }}
-                                  aria-label="Copy COE LOC"
-                                >
-                                  {copiedMetaKey === `${a.id}|coeLoc` ? "Copied!" : meta.coeLoc}
-                                </button>
-                              )}
+                          {!hideCoeFields && (
+                            <div>
+                              <div className="text-xs font-medium text-slate-500 uppercase tracking-wide">COE LOC</div>
+                              <div className="mt-1 flex items-center gap-2">
+                                <input
+                                  className={`${inputBase} flex-1 min-w-0`}
+                                  placeholder="COE LOC"
+                                  value={meta.coeLoc || ""}
+                                  onChange={(e) => setAssetMeta(wo, product.code, a.id, { coeLoc: e.target.value })}
+                                  onMouseDown={(event) => event.stopPropagation()}
+                                />
+                                {meta.coeLoc && (
+                                  <button
+                                    type="button"
+                                    className={`${copyChipClasses} ${copyChipTruncate}`}
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      copyAssetField("coeLoc", meta.coeLoc, `${a.id}|coeLoc`);
+                                    }}
+                                    aria-label="Copy COE LOC"
+                                  >
+                                    {copiedMetaKey === `${a.id}|coeLoc` ? "Copied!" : meta.coeLoc}
+                                  </button>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                          <div>
-                            <div className="text-xs font-medium text-slate-500 uppercase tracking-wide">Rack/Bay</div>
-                            <div className="mt-1 flex items-center gap-2">
-                              <input
-                                className={`${inputBase} flex-1 min-w-0`}
-                                placeholder="RACK/BAY"
-                                value={meta.rackBay || ""}
-                                onChange={(e) => setAssetMeta(wo, product.code, a.id, { rackBay: e.target.value })}
-                                onMouseDown={(event) => event.stopPropagation()}
-                              />
-                              {meta.rackBay && (
-                                <button
-                                  type="button"
-                                  className={`${copyChipClasses} ${copyChipTruncate}`}
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    copyAssetField("rackBay", meta.rackBay, `${a.id}|rackBay`);
-                                  }}
-                                  aria-label="Copy Rack/Bay"
-                                >
-                                  {copiedMetaKey === `${a.id}|rackBay` ? "Copied!" : meta.rackBay}
-                                </button>
-                              )}
+                          )}
+                          {!hideCoeFields && (
+                            <div>
+                              <div className="text-xs font-medium text-slate-500 uppercase tracking-wide">Rack/Bay</div>
+                              <div className="mt-1 flex items-center gap-2">
+                                <input
+                                  className={`${inputBase} flex-1 min-w-0`}
+                                  placeholder="RACK/BAY"
+                                  value={meta.rackBay || ""}
+                                  onChange={(e) => setAssetMeta(wo, product.code, a.id, { rackBay: e.target.value })}
+                                  onMouseDown={(event) => event.stopPropagation()}
+                                />
+                                {meta.rackBay && (
+                                  <button
+                                    type="button"
+                                    className={`${copyChipClasses} ${copyChipTruncate}`}
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      copyAssetField("rackBay", meta.rackBay, `${a.id}|rackBay`);
+                                    }}
+                                    aria-label="Copy Rack/Bay"
+                                  >
+                                    {copiedMetaKey === `${a.id}|rackBay` ? "Copied!" : meta.rackBay}
+                                  </button>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                          <div>
-                            <div className="text-xs font-medium text-slate-500 uppercase tracking-wide">SEPCAT</div>
-                            <div className="mt-1 flex items-center gap-2">
-                              <input
-                                className={`${inputBase} flex-1 min-w-0`}
-                                placeholder="SEPCAT"
-                                value={meta.sepcat || ""}
-                                onChange={(e) => setAssetMeta(wo, product.code, a.id, { sepcat: e.target.value })}
-                                onMouseDown={(event) => event.stopPropagation()}
-                              />
-                              {meta.sepcat && (
-                                <button
-                                  type="button"
-                                  className={`${copyChipClasses} ${copyChipTruncate}`}
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    copyAssetField("sepcat", meta.sepcat, `${a.id}|sepcat`);
-                                  }}
-                                  aria-label="Copy SEPCAT"
-                                >
-                                  {copiedMetaKey === `${a.id}|sepcat` ? "Copied!" : meta.sepcat}
-                                </button>
-                              )}
+                          )}
+                          {!hideCoeFields && (
+                            <div>
+                              <div className="text-xs font-medium text-slate-500 uppercase tracking-wide">SEPCAT</div>
+                              <div className="mt-1 flex items-center gap-2">
+                                <input
+                                  className={`${inputBase} flex-1 min-w-0`}
+                                  placeholder="SEPCAT"
+                                  value={meta.sepcat || ""}
+                                  onChange={(e) => setAssetMeta(wo, product.code, a.id, { sepcat: e.target.value })}
+                                  onMouseDown={(event) => event.stopPropagation()}
+                                />
+                                {meta.sepcat && (
+                                  <button
+                                    type="button"
+                                    className={`${copyChipClasses} ${copyChipTruncate}`}
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      copyAssetField("sepcat", meta.sepcat, `${a.id}|sepcat`);
+                                    }}
+                                    aria-label="Copy SEPCAT"
+                                  >
+                                    {copiedMetaKey === `${a.id}|sepcat` ? "Copied!" : meta.sepcat}
+                                  </button>
+                                )}
+                              </div>
                             </div>
-                          </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -852,7 +862,9 @@ export default function ProductCard({
                   const assetCopyKey = (field) => `${a.id}|${field}`;
                   const categoryNormalized = (a.allocationCategory ?? "").trim().toLowerCase();
                   const isCustomAllocation = Boolean(a.allocationCategoryIsCustom) || categoryNormalized === "custom";
-                  const shouldHideAssetFields = isCustomAllocation || ASSET_META_SUPPRESSED_CATEGORIES.has(categoryNormalized);
+                  const isSuppressedCategory = ASSET_META_SUPPRESSED_CATEGORIES.has(categoryNormalized);
+                  const hideAssetFields = isCustomAllocation || isSuppressedCategory;
+                  const hideCoeFields = hideAssetFields || !isScxrProduct;
                   return (<tr key={a.id} className="border-t">
                     <td className="py-1 pr-3">{a.type}</td>
                     <td className="py-1 pr-3">{a.type === "reel" ? a.footage : a.qty}</td>
@@ -862,7 +874,7 @@ export default function ProductCard({
                     <td className="py-1 pr-3">{a.allocationCategory || ""}</td>
                     <td className="py-1 pr-3">{a.reelSerial || ""}</td>
                     <td className="py-1 pr-3">
-                      {shouldHideAssetFields ? (
+                      {hideAssetFields ? (
                         <span className="text-slate-400">—</span>
                       ) : (
                         <div className="flex items-center gap-2">
@@ -883,7 +895,7 @@ export default function ProductCard({
                       )}
                     </td>
                     <td className="py-1 pr-3">
-                      {shouldHideAssetFields ? (
+                      {hideCoeFields ? (
                         <span className="text-slate-400">—</span>
                       ) : (
                         <div className="flex items-center gap-2">
@@ -904,7 +916,7 @@ export default function ProductCard({
                       )}
                     </td>
                     <td className="py-1 pr-3">
-                      {shouldHideAssetFields ? (
+                      {hideCoeFields ? (
                         <span className="text-slate-400">—</span>
                       ) : (
                         <div className="flex items-center gap-2">
@@ -925,7 +937,7 @@ export default function ProductCard({
                       )}
                     </td>
                     <td className="py-1 pr-3">
-                      {shouldHideAssetFields ? (
+                      {hideCoeFields ? (
                         <span className="text-slate-400">—</span>
                       ) : (
                         <div className="flex items-center gap-2">
