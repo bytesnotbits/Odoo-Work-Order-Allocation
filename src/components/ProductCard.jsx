@@ -619,18 +619,19 @@ export default function ProductCard({
                         <div className="text-sm font-semibold">
                           {a.type === "reel" ? "Reel piece" : "Quantity allocation"}
                         </div>
-                        <button
-                          type="button"
-                          className="inline-flex items-center justify-center px-2 py-1 rounded border text-sm"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            removeAllocation(wo, product.code, a.id);
-                          }}
-                          aria-label="Remove allocation"
-                          disabled={locked}
-                        >
-                          ✕
-                        </button>
+                        {!locked && (
+                          <button
+                            type="button"
+                            className="inline-flex items-center justify-center px-2 py-1 rounded border text-sm"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              removeAllocation(wo, product.code, a.id);
+                            }}
+                            aria-label="Remove allocation"
+                          >
+                            ✕
+                          </button>
+                        )}
                       </div>
                       {a.type === "reel" && (
                         <div className="flex flex-wrap gap-2 mt-2 text-[11px]">
