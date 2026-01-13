@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { MISC_PRODUCT_CODE, isMiscProductCode } from "../lib/data";
 import { uid } from "../lib/uid";
+import { normalizeReelBounds } from "../lib/reelSpans";
 
 export function useAllocations(grouped) {
   // { "WO|CODE": { allocations: [], assets: { [allocId]: string | {assetId, coeLoc, rackBay, sepcat} }, reels: {}, locked: bool, cableMode: bool } }
@@ -252,16 +253,6 @@ export function useAllocations(grouped) {
       return next;
     });
     alert(`WO ${wo} marked complete.`);
-  };
-
-  const normalizeReelBounds = (outer, inner) => {
-    const o = Number(outer);
-    const i = Number(inner);
-    if (!Number.isFinite(o) || !Number.isFinite(i)) return null;
-    const start = Math.min(o, i);
-    const end = Math.max(o, i);
-    if (start === end) return null;
-    return { start, end, outer: o, inner: i };
   };
 
   const splitPendingReturnAllocations = (allocations, interval, reelSerialKey) => {

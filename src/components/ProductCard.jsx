@@ -1,5 +1,11 @@
 import { useState } from "react";
 import { ALLOCATION_OPTIONS, MISC_PRODUCT_NOTE, isMiscProductCode } from "../lib/data";
+import {
+  computeSpanGaps,
+  collectReelIntervals,
+  normalizeReelBounds,
+  isPendingAllocation,
+} from "../lib/reelSpans";
 import Badge from "./Badge";
 import { Plus, Trash2, Ruler } from "lucide-react";
 
@@ -75,6 +81,13 @@ export default function ProductCard({
     const remainingSpan = Math.max(total - covered, 0);
     return { serial, hasSpan: true, total, covered, remainingSpan };
   });
+  const reelSpanBounds = reelSerial ? normalizeReelBounds(currentSpan.start, currentSpan.end) : null;
+  const missingSegments = reelSpanBounds && reelSerial
+    ? computeSpanGaps(
+        reelSpanBounds,
+        collectReelIntervals(extra.allocations, reelSerial, (alloc) => !isPendingAllocation(alloc)),
+      )
+    : [];
   const primaryButton = [
     "inline-flex items-center gap-2 px-3 py-2 rounded-xl border transition font-semibold shadow-sm",
     "bg-blue-600 text-white border-blue-600",
@@ -204,31 +217,38 @@ export default function ProductCard({
     setSelectedAllocation(null);
   }
 
-  const hasReelAllocationForSerial = (serialToCheck) => {
-    const normalizedTarget = (serialToCheck || "").trim().toLowerCase();
-    if (!normalizedTarget) return false;
-    return (extra.allocations || []).some((alloc) => {
-      if (alloc.type !== "reel") return false;
-      const existingSerial = (alloc.reelSerial || "").trim().toLowerCase();
-      return existingSerial === normalizedTarget;
-    });
-  };
-
-  const maybeAddPendingAllocationForSpan = (serialToUse, startValue, endValue) => {
-    if (!addReelAllocation) return;
-    if (!serialToUse) return;
-    if (hasReelAllocationForSerial(serialToUse)) return;
-    const result = addReelAllocation(wo, product.code, {
-      type: "reel",
-      outer: endValue,
-      inner: startValue,
-      allocationId: "",
-      allocationCategory: DEFAULT_PENDING_CATEGORY,
-      allocationCategoryIsCustom: false,
-      reelSerial: serialToUse,
-    });
-    if (result?.error) {
-      safeAlert(result.error);
+  const normalizeSerialKey = (value) => String(value || "").trim().toLowerCase();
+  const syncPendingAllocationsForSpan = (serialToUse, spanBounds) => {
+    if (!addReelAllocation || !serialToUse || !spanBounds) return;
+    const accountedIntervals = collectReelIntervals(
+      extra.allocations,
+      serialToUse,
+      (alloc) => !isPendingAllocation(alloc),
+    );
+    const gaps = computeSpanGaps(spanBounds, accountedIntervals);
+    const normalizedSerial = normalizeSerialKey(serialToUse);
+    const pendingIds = extra.allocations
+      .filter((alloc) => (
+        alloc.type === "reel" &&
+        normalizeSerialKey(alloc.reelSerial) === normalizedSerial &&
+        isPendingAllocation(alloc)
+      ))
+      .map((alloc) => alloc.id);
+    pendingIds.forEach((id) => removeAllocation(wo, product.code, id));
+    for (const gap of gaps) {
+      const result = addReelAllocation(wo, product.code, {
+        type: "reel",
+        outer: gap.end,
+        inner: gap.start,
+        allocationId: "",
+        allocationCategory: DEFAULT_PENDING_CATEGORY,
+        allocationCategoryIsCustom: false,
+        reelSerial: serialToUse,
+      });
+      if (result?.error) {
+        safeAlert(result.error);
+        break;
+      }
     }
   };
 
@@ -238,8 +258,10 @@ export default function ProductCard({
     const startValue = Number(spanStartInput);
     const endValue = Number(spanEndInput);
     if (!isFinite(startValue) || !isFinite(endValue)) return safeAlert("Enter numeric span start/end");
+    const normalizedSpan = normalizeReelBounds(startValue, endValue);
+    if (!normalizedSpan) return safeAlert("Span start and end must differ");
     setReelSpan(wo, product.code, reelSerial, startValue, endValue);
-    maybeAddPendingAllocationForSpan(reelSerial, startValue, endValue);
+    syncPendingAllocationsForSpan(trimmedSerial, normalizedSpan);
   };
 
   const defaultCategory = ALLOCATION_OPTIONS[0] || "";
@@ -466,27 +488,50 @@ export default function ProductCard({
       </button>
     </div>
                   {/* Coverage summary */}
-                  {knownReels.length === 0 ? (
-                    <div className="text-sm text-gray-500 mt-2">No spans saved for this product yet.</div>
-                  ) : (
-                    <div className="space-y-1 text-sm mt-2">
-                      {reelSpanSummaries.map(({ serial, hasSpan, total, covered, remainingSpan }) => (
-                        hasSpan ? (
-                          <div
-                            key={serial}
-                            className={`text-gray-600 ${serial === reelSerial ? "text-gray-800 font-semibold" : ""}`}
-                          >
-                            [{serial}] Span total: <b>{total}</b> | Covered: <b>{covered}</b> | Remaining: <b>{remainingSpan}</b>
-                          </div>
-                        ) : (
-                          <div key={serial} className="text-gray-500">
-                            [{serial}] No span saved for this reel yet.
-                          </div>
-                        )
-                      ))}
-                    </div>
-                  )}
-                </div>
+                {knownReels.length === 0 ? (
+                  <div className="text-sm text-gray-500 mt-2">No spans saved for this product yet.</div>
+                ) : (
+                  <div className="space-y-1 text-sm mt-2">
+                    {reelSpanSummaries.map(({ serial, hasSpan, total, covered, remainingSpan }) => (
+                      hasSpan ? (
+                        <div
+                          key={serial}
+                          className={`text-gray-600 ${serial === reelSerial ? "text-gray-800 font-semibold" : ""}`}
+                        >
+                          [{serial}] Span total: <b>{total}</b> | Covered: <b>{covered}</b> | Remaining: <b>{remainingSpan}</b>
+                        </div>
+                      ) : (
+                        <div key={serial} className="text-gray-500">
+                          [{serial}] No span saved for this reel yet.
+                        </div>
+                      )
+                    ))}
+                  </div>
+                )}
+                {reelSpanBounds && (
+                  <div className="mt-3 text-sm">
+                    {missingSegments.length === 0 ? (
+                      <div className="text-emerald-700 font-semibold">Span fully accounted for</div>
+                    ) : (
+                      <div className="space-y-1">
+                        <div className="text-[11px] uppercase tracking-wide text-amber-600 font-semibold">
+                          Unaccounted span segments
+                        </div>
+                        <ul className="list-disc list-inside text-amber-700">
+                          {missingSegments.map((segment, idx) => (
+                            <li key={`${segment.start}-${segment.end}-${idx}`} className="leading-tight">
+                              <span className="font-semibold text-amber-900">
+                                [{segment.start}–{segment.end}]
+                              </span>{" "}
+                              {Math.abs(segment.end - segment.start)} ft unallocated / missing
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
 
                 {/* Reel piece */}
                 <div className="flex items-center gap-2"><Ruler className="w-4 h-4" /> <div className="font-medium">Reel piece</div></div>
