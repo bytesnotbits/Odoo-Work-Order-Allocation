@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { ALLOCATION_OPTIONS, MISC_PRODUCT_NOTE, isMiscProductCode } from "../lib/data";
 import {
   computeSpanGaps,
@@ -104,6 +104,9 @@ export default function ProductCard({
   const [spanEndInput, setSpanEndInput] = useState("");
   const [selectedSpanId, setSelectedSpanId] = useState("");
   const [selectedAllocation, setSelectedAllocation] = useState(null);
+  const [coeLocInput, setCoeLocInput] = useState("");
+  const [rackBayInput, setRackBayInput] = useState("");
+  const [sepcatInput, setSepcatInput] = useState("");
 
   if (!base) return null;
 
@@ -195,9 +198,21 @@ export default function ProductCard({
     "disabled:opacity-50 disabled:cursor-not-allowed",
   ].join(" ");
 
+  const allocationOptionsForProduct = useMemo(
+    () => (isScxrProduct ? ["SCXR"] : ALLOCATION_OPTIONS),
+    [isScxrProduct],
+  );
+  useEffect(() => {
+    setAllocCategory(allocationOptionsForProduct[0]);
+    setAllocCategoryCustom("");
+  }, [allocationOptionsForProduct]);
   const finalCategory = () =>
     allocCategory === "__custom__" ? (allocCategoryCustom || "Custom") : allocCategory;
   const isCustomCategory = () => allocCategory === "__custom__";
+  const hasScxrMetaInput = isScxrProduct && [coeLocInput, rackBayInput, sepcatInput].some((value) => String(value || "").trim() !== "");
+  const scxrMeta = hasScxrMetaInput
+    ? { coeLoc: coeLocInput, rackBay: rackBayInput, sepcat: sepcatInput }
+    : null;
   const isReturnCategory = (category) => ["Returned", "Pending"].includes(category);
   const isPendingCategory = (category) =>
     String(category || "").trim().toLowerCase() === DEFAULT_PENDING_CATEGORY.toLowerCase();
@@ -225,14 +240,17 @@ export default function ProductCard({
     if (selectedAllocation?.id && selectedAllocation.type !== "reel" && typeof updateAllocation === "function") {
       updateAllocation(wo, product.code, selectedAllocation.id, payload);
     } else {
-      upsertAllocation(wo, product.code, payload);
+      upsertAllocation(wo, product.code, payload, scxrMeta);
     }
     setAllocQty("");
     setAllocId("");
     setReelSerial("");
-    setAllocCategory(ALLOCATION_OPTIONS[0]);
+    setAllocCategory(allocationOptionsForProduct[0]);
     setAllocCategoryCustom("");
     setSelectedAllocation(null);
+    setCoeLocInput("");
+    setRackBayInput("");
+    setSepcatInput("");
   }
 
   function handleUpdateRegular() {
@@ -288,28 +306,39 @@ export default function ProductCard({
     }
 
     if (addReelAllocation) {
-      const result = addReelAllocation(wo, product.code, basePayload, editingReel ? { replaceId: selectedAllocation.id } : undefined);
+      const options = editingReel
+        ? { replaceId: selectedAllocation.id, assetMeta: scxrMeta }
+        : scxrMeta
+          ? { assetMeta: scxrMeta }
+          : undefined;
+      const result = addReelAllocation(wo, product.code, basePayload, options);
       if (result?.error) return safeAlert(result.error);
       setOuter("");
       setInner("");
       setAllocId("");
       setReelSerial("");
-      setAllocCategory(ALLOCATION_OPTIONS[0]);
+      setAllocCategory(allocationOptionsForProduct[0]);
       setAllocCategoryCustom("");
       setSelectedAllocation(null);
+      setCoeLocInput("");
+      setRackBayInput("");
+      setSepcatInput("");
       return;
     }
 
     const payload = { ...basePayload, footage: reelFootage };
-    upsertAllocation(wo, product.code, payload);
+    upsertAllocation(wo, product.code, payload, scxrMeta);
 
     setOuter("");
     setInner("");
     setAllocId("");
     setReelSerial("");
-    setAllocCategory(ALLOCATION_OPTIONS[0]);
+    setAllocCategory(allocationOptionsForProduct[0]);
     setAllocCategoryCustom("");
     setSelectedAllocation(null);
+    setCoeLocInput("");
+    setRackBayInput("");
+    setSepcatInput("");
   }
 
   const syncPendingAllocationsForSpan = (serialToUse, span) => {
@@ -538,6 +567,38 @@ export default function ProductCard({
               )}
             </div>
 
+            {isScxrProduct && (
+              <div className="grid md:grid-cols-3 gap-2 mb-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 uppercase tracking-wide">COE LOC</label>
+                  <input
+                    className="w-full border rounded-xl p-2"
+                    placeholder="COE LOC"
+                    value={coeLocInput}
+                    onChange={(e) => setCoeLocInput(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 uppercase tracking-wide">Rack/Bay</label>
+                  <input
+                    className="w-full border rounded-xl p-2"
+                    placeholder="RACK/BAY"
+                    value={rackBayInput}
+                    onChange={(e) => setRackBayInput(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 uppercase tracking-wide">SEPCAT</label>
+                  <input
+                    className="w-full border rounded-xl p-2"
+                    placeholder="SEPCAT"
+                    value={sepcatInput}
+                    onChange={(e) => setSepcatInput(e.target.value)}
+                  />
+                </div>
+              </div>
+            )}
+
             {!cableMode && (
               <div className="space-y-2">
                 <label className="block text-sm">Quantity</label>
@@ -547,7 +608,7 @@ export default function ProductCard({
                 <label className="block text-sm mt-2">Allocation Category</label>
                 <div className="flex gap-2">
                   <select className="border rounded-xl p-2" value={allocCategory} onChange={(e) => setAllocCategory(e.target.value)}>
-                    {ALLOCATION_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
+                    {allocationOptionsForProduct.map((o) => <option key={o} value={o}>{o}</option>)}
                     <option value="__custom__">Custom…</option>
                   </select>
                   {allocCategory === "__custom__" && (

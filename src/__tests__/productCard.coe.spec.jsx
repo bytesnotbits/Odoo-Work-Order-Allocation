@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import ProductCard from '../components/ProductCard.jsx';
 
 vi.mock('../lib/data', () => ({
@@ -19,18 +19,31 @@ const baseProps = {
   locked:false
 };
 
-test('SCXR allocations show COE inputs in Engineering', () => {
+const getAddAllocationCard = () => screen.getByText(/Add allocation/i).parentElement;
+const getFirstAllocationCard = () => screen.getByText(/Quantity allocation/i).closest(".rounded-2xl");
+
+test('SCXR add allocation form surfaces COE inputs in Engineering', () => {
   render(<ProductCard {...baseProps} tab="engineering" />);
-  expect(screen.getByPlaceholderText(/COE LOC/i)).toBeInTheDocument();
-  expect(screen.getByPlaceholderText(/RACK\/BAY/i)).toBeInTheDocument();
-  expect(screen.getByPlaceholderText(/SEPCAT/i)).toBeInTheDocument();
+  const addAllocationCard = getAddAllocationCard();
+  expect(within(addAllocationCard).getByPlaceholderText(/COE LOC/i)).toBeInTheDocument();
+  expect(within(addAllocationCard).getByPlaceholderText(/RACK\/BAY/i)).toBeInTheDocument();
+  expect(within(addAllocationCard).getByPlaceholderText(/SEPCAT/i)).toBeInTheDocument();
+  expect(within(addAllocationCard).getByRole("combobox").value).toBe("SCXR");
+  const allocationCard = getFirstAllocationCard();
+  expect(allocationCard).toBeTruthy();
+  expect(within(allocationCard).getByPlaceholderText(/COE LOC/i)).toBeInTheDocument();
 });
 
-test('SCXR allocations show COE inputs in Accounting', () => {
+test('SCXR add allocation form surfaces COE inputs in Accounting', () => {
   render(<ProductCard {...baseProps} tab="accounting" />);
-  expect(screen.getByPlaceholderText(/COE LOC/i)).toBeInTheDocument();
-  expect(screen.getByPlaceholderText(/RACK\/BAY/i)).toBeInTheDocument();
-  expect(screen.getByPlaceholderText(/SEPCAT/i)).toBeInTheDocument();
+  const addAllocationCard = getAddAllocationCard();
+  expect(within(addAllocationCard).getByPlaceholderText(/COE LOC/i)).toBeInTheDocument();
+  expect(within(addAllocationCard).getByPlaceholderText(/RACK\/BAY/i)).toBeInTheDocument();
+  expect(within(addAllocationCard).getByPlaceholderText(/SEPCAT/i)).toBeInTheDocument();
+  expect(within(addAllocationCard).getByRole("combobox").value).toBe("SCXR");
+  const allocationCard = getFirstAllocationCard();
+  expect(allocationCard).toBeTruthy();
+  expect(within(allocationCard).getByPlaceholderText(/COE LOC/i)).toBeInTheDocument();
 });
 
 test('Non-SCXR allocations hide COE inputs in Engineering', () => {

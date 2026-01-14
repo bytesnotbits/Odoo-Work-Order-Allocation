@@ -278,10 +278,11 @@ export default function App() {
 
   const handleUpsertAllocation = useCallback(
     (wo, code, payload) => {
-      upsertAllocation(wo, code, payload);
-      if (!wo || !payload) return;
+      if (!wo || !payload) return undefined;
+      const allocId = upsertAllocation(wo, code, payload);
       const detail = describeAllocationPayload(wo, code, payload);
       logAuditEvent(wo, "Recorded allocation", detail);
+      return allocId;
     },
     [upsertAllocation, describeAllocationPayload, logAuditEvent],
   );

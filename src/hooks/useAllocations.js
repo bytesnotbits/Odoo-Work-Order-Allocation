@@ -135,12 +135,21 @@ export function useAllocations(grouped) {
     };
   };
 
-  const upsertAllocation = (wo, code, alloc) => {
+  const upsertAllocation = (wo, code, alloc, assetMeta = null) => {
+    const newAlloc = { id: uid(), ...alloc };
     setAllocState(prev => {
       const k = keyOf(wo, code);
       const cur = buildReelState(prev[k] || {});
-      return { ...prev, [k]: { ...cur, allocations: [...cur.allocations, { id: uid(), ...alloc }] } };
+      const updatedAssets = { ...cur.assets };
+      if (assetMeta && typeof assetMeta === "object" && Object.keys(assetMeta).length > 0) {
+        const previousMeta = typeof updatedAssets[newAlloc.id] === "object"
+          ? updatedAssets[newAlloc.id]
+          : { assetId: "", coeLoc: "", rackBay: "", sepcat: "" };
+        updatedAssets[newAlloc.id] = { ...previousMeta, ...assetMeta };
+      }
+      return { ...prev, [k]: { ...cur, allocations: [...cur.allocations, newAlloc], assets: updatedAssets } };
     });
+    return newAlloc.id;
   };
 
   const removeAllocation = (wo, code, id) => {
@@ -428,7 +437,7 @@ export function useAllocations(grouped) {
     const reelSerialKey = (alloc.reelSerial || "");
     const k = keyOf(wo, code);
     const current = buildReelState(allocState[k] || {});
-    const replaceId = options.replaceId;
+    const { replaceId, assetMeta } = options || {};
     const { allocations: staged, removedIds } = splitPendingReturnAllocations(
       current.allocations,
       { start: bounds.start, end: bounds.end },
@@ -449,6 +458,12 @@ export function useAllocations(grouped) {
     setAllocState((prev) => {
       const cur = buildReelState(prev[k] || {});
       const adjustedAssets = { ...cur.assets };
+      if (assetMeta && typeof assetMeta === "object" && Object.keys(assetMeta).length > 0) {
+        const previousMeta = typeof adjustedAssets[newAlloc.id] === "object"
+          ? adjustedAssets[newAlloc.id]
+          : { assetId: "", coeLoc: "", rackBay: "", sepcat: "" };
+        adjustedAssets[newAlloc.id] = { ...previousMeta, ...assetMeta };
+      }
       const adjustedCoe = { ...(cur.coe || {}) };
       for (const id of removedIds) {
         if (id === newAlloc.id) continue;
@@ -465,7 +480,7 @@ export function useAllocations(grouped) {
         },
       };
     });
-    return { success: true };
+    return { success: true, id: newAlloc.id };
   };
 
   const updateAllocation = (wo, code, allocId, fields) => {
