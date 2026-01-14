@@ -1,10 +1,14 @@
 import { render, screen } from '@testing-library/react';
 import ProductCard from '../components/ProductCard.jsx';
 
-vi.mock('../lib/data', () => ({
-  ALLOCATION_OPTIONS: ['Aerial'],
-  isMiscProductCode: () => false,
-}));
+vi.mock('../lib/data', () => {
+  const SEPCAT_OPTIONS = ["411J", "3", "2/3", "4CTX", "4ETS", "4FO", "4ISP", "CP", "CO", "NR"];
+  return {
+    ALLOCATION_OPTIONS: ['Aerial'],
+    SEPCAT_OPTIONS,
+    isMiscProductCode: () => false,
+  };
+});
 
 const baseProps = {
   wo: 'WO-TEST',

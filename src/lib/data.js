@@ -1,7 +1,18 @@
 // Constants + demo data
 export const ALLOCATION_OPTIONS = ["Aerial", "Buried", "Underground", "Removal", "Expense", "SCXR", "Pending", "Returned"];
-// COE SepCat choices (placeholder — tweak to your list)
-export const SEPCAT_OPTIONS = ["PROVISION", "SCRAP", "REDEPLOY", "UNKNOWN"];
+// COE SepCat choices (updated to dropdown)
+export const SEPCAT_OPTIONS = [
+  "411J",
+  "3",
+  "2/3",
+  "4CTX",
+  "4ETS",
+  "4FO",
+  "4ISP",
+  "CP",
+  "CO",
+  "NR",
+];
 export const MISC_PRODUCT_CODE = "MISC";
 export const MISC_PRODUCT_PREFIX = "MISC-";
 export const MISC_PRODUCT_DESC = "Miscellaneous material (provisional)";

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from "react";
-import { ALLOCATION_OPTIONS, MISC_PRODUCT_NOTE, isMiscProductCode } from "../lib/data";
+import { ALLOCATION_OPTIONS, MISC_PRODUCT_NOTE, isMiscProductCode, SEPCAT_OPTIONS } from "../lib/data";
 import {
   computeSpanGaps,
   collectReelIntervals,
@@ -82,6 +82,9 @@ export default function ProductCard({
     pendingReturnSum, returnedSum, netAllocated, remaining,
     cableMode, cableSuggested
   } = getItemState(wo, product.code);
+  const safeIdValue = (value) => String(value || "").replace(/[^a-zA-Z0-9-_:.]+/g, "-") || "field";
+  const sepcatFieldId = `sepcat-${safeIdValue(wo)}-${safeIdValue(product.code)}`;
+  const allocationCategoryFieldId = `allocation-category-${safeIdValue(wo)}-${safeIdValue(product.code)}`;
   const isMiscProduct = isMiscProductCode(product.code);
   const productGroupLabel = String(product.group || "").trim().toUpperCase();
   const isScxrProduct = productGroupLabel.includes("SCXR");
@@ -106,7 +109,7 @@ export default function ProductCard({
   const [selectedAllocation, setSelectedAllocation] = useState(null);
   const [coeLocInput, setCoeLocInput] = useState("");
   const [rackBayInput, setRackBayInput] = useState("");
-  const [sepcatInput, setSepcatInput] = useState("");
+  const [sepcatInput, setSepcatInput] = useState(SEPCAT_OPTIONS[0]);
 
   if (!base) return null;
 
@@ -250,7 +253,7 @@ export default function ProductCard({
     setSelectedAllocation(null);
     setCoeLocInput("");
     setRackBayInput("");
-    setSepcatInput("");
+    setSepcatInput(SEPCAT_OPTIONS[0]);
   }
 
   function handleUpdateRegular() {
@@ -322,7 +325,7 @@ export default function ProductCard({
       setSelectedAllocation(null);
       setCoeLocInput("");
       setRackBayInput("");
-      setSepcatInput("");
+      setSepcatInput(SEPCAT_OPTIONS[0]);
       return;
     }
 
@@ -338,7 +341,7 @@ export default function ProductCard({
     setSelectedAllocation(null);
     setCoeLocInput("");
     setRackBayInput("");
-    setSepcatInput("");
+    setSepcatInput(SEPCAT_OPTIONS[0]);
   }
 
   const syncPendingAllocationsForSpan = (serialToUse, span) => {
@@ -588,13 +591,21 @@ export default function ProductCard({
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-500 uppercase tracking-wide">SEPCAT</label>
-                  <input
+                  <label htmlFor={sepcatFieldId} className="block text-xs font-medium text-slate-500 uppercase tracking-wide">
+                    SEPCAT
+                  </label>
+                  <select
+                    id={sepcatFieldId}
                     className="w-full border rounded-xl p-2"
-                    placeholder="SEPCAT"
                     value={sepcatInput}
                     onChange={(e) => setSepcatInput(e.target.value)}
-                  />
+                  >
+                    {SEPCAT_OPTIONS.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
             )}
@@ -605,9 +616,14 @@ export default function ProductCard({
                 <input type="number" min={0} step={1} className="w-full border rounded-xl p-2" value={allocQty} onChange={(e) => setAllocQty(e.target.value)} />
                 <label className="block text-sm">Allocation notes (optional)</label>
                 <input className="w-full border rounded-xl p-2" value={allocId} onChange={(e) => setAllocId(e.target.value)} placeholder="e.g., AERIAL-FIBER-01" />
-                <label className="block text-sm mt-2">Allocation Category</label>
+                <label htmlFor={allocationCategoryFieldId} className="block text-sm mt-2">Allocation Category</label>
                 <div className="flex gap-2">
-                  <select className="border rounded-xl p-2" value={allocCategory} onChange={(e) => setAllocCategory(e.target.value)}>
+                  <select
+                    id={allocationCategoryFieldId}
+                    className="border rounded-xl p-2"
+                    value={allocCategory}
+                    onChange={(e) => setAllocCategory(e.target.value)}
+                  >
                     {allocationOptionsForProduct.map((o) => <option key={o} value={o}>{o}</option>)}
                     <option value="__custom__">Custom…</option>
                   </select>

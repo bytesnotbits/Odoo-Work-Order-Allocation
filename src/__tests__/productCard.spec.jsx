@@ -11,10 +11,14 @@ afterEach(() => {
 });
 
 // Mock ALLOCATION_OPTIONS used by the component
-vi.mock('../lib/data', () => ({
-      ALLOCATION_OPTIONS: ['Aerial', 'Buried', 'Underground', 'Removal', 'Pending', 'Returned'],
-      isMiscProductCode: () => false,
-}));
+vi.mock('../lib/data', () => {
+  const SEPCAT_OPTIONS = ["411J", "3", "2/3", "4CTX", "4ETS", "4FO", "4ISP", "CP", "CO", "NR"];
+  return {
+    ALLOCATION_OPTIONS: ['Aerial', 'Buried', 'Underground', 'Removal', 'Pending', 'Returned'],
+    SEPCAT_OPTIONS,
+    isMiscProductCode: () => false,
+  };
+});
 
 function renderProductCard(overrides = {}) {
   const defaultProps = {

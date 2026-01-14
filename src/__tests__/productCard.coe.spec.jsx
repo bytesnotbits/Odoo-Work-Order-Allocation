@@ -1,10 +1,14 @@
 import { render, screen, within } from '@testing-library/react';
 import ProductCard from '../components/ProductCard.jsx';
 
-vi.mock('../lib/data', () => ({
-  ALLOCATION_OPTIONS: ['Aerial'],
-  isMiscProductCode: () => false,
-}));
+vi.mock('../lib/data', () => {
+  const SEPCAT_OPTIONS = ["411J", "3", "2/3", "4CTX", "4ETS", "4FO", "4ISP", "CP", "CO", "NR"];
+  return {
+    ALLOCATION_OPTIONS: ['Aerial'],
+    SEPCAT_OPTIONS,
+    isMiscProductCode: () => false,
+  };
+});
 
 const baseProduct = { code: '111', desc: 'Item', posted: 1, returned: 0, isCable:false, group: 'SCXR' };
 const baseProps = {
@@ -27,8 +31,9 @@ test('SCXR add allocation form surfaces COE inputs in Engineering', () => {
   const addAllocationCard = getAddAllocationCard();
   expect(within(addAllocationCard).getByPlaceholderText(/COE LOC/i)).toBeInTheDocument();
   expect(within(addAllocationCard).getByPlaceholderText(/RACK\/BAY/i)).toBeInTheDocument();
-  expect(within(addAllocationCard).getByPlaceholderText(/SEPCAT/i)).toBeInTheDocument();
-  expect(within(addAllocationCard).getByRole("combobox").value).toBe("SCXR");
+  expect(within(addAllocationCard).getByLabelText(/SEPCAT/i)).toBeInTheDocument();
+  const allocationCategorySelect = within(addAllocationCard).getByRole("combobox", { name: /Allocation Category/i });
+  expect(allocationCategorySelect.value).toBe("SCXR");
   const allocationCard = getFirstAllocationCard();
   expect(allocationCard).toBeTruthy();
   expect(within(allocationCard).getByPlaceholderText(/COE LOC/i)).toBeInTheDocument();
@@ -39,8 +44,9 @@ test('SCXR add allocation form surfaces COE inputs in Accounting', () => {
   const addAllocationCard = getAddAllocationCard();
   expect(within(addAllocationCard).getByPlaceholderText(/COE LOC/i)).toBeInTheDocument();
   expect(within(addAllocationCard).getByPlaceholderText(/RACK\/BAY/i)).toBeInTheDocument();
-  expect(within(addAllocationCard).getByPlaceholderText(/SEPCAT/i)).toBeInTheDocument();
-  expect(within(addAllocationCard).getByRole("combobox").value).toBe("SCXR");
+  expect(within(addAllocationCard).getByLabelText(/SEPCAT/i)).toBeInTheDocument();
+  const allocationCategorySelect = within(addAllocationCard).getByRole("combobox", { name: /Allocation Category/i });
+  expect(allocationCategorySelect.value).toBe("SCXR");
   const allocationCard = getFirstAllocationCard();
   expect(allocationCard).toBeTruthy();
   expect(within(allocationCard).getByPlaceholderText(/COE LOC/i)).toBeInTheDocument();
@@ -50,12 +56,12 @@ test('Non-SCXR allocations hide COE inputs in Engineering', () => {
   render(<ProductCard {...baseProps} product={{ ...baseProps.product, group: 'OTHER' }} tab="engineering" />);
   expect(screen.queryByPlaceholderText(/COE LOC/i)).not.toBeInTheDocument();
   expect(screen.queryByPlaceholderText(/RACK\/BAY/i)).not.toBeInTheDocument();
-  expect(screen.queryByPlaceholderText(/SEPCAT/i)).not.toBeInTheDocument();
+  expect(screen.queryByLabelText(/SEPCAT/i)).not.toBeInTheDocument();
 });
 
 test('Non-SCXR allocations hide COE inputs in Accounting', () => {
   render(<ProductCard {...baseProps} product={{ ...baseProps.product, group: 'OTHER' }} tab="accounting" />);
   expect(screen.queryByPlaceholderText(/COE LOC/i)).not.toBeInTheDocument();
   expect(screen.queryByPlaceholderText(/RACK\/BAY/i)).not.toBeInTheDocument();
-  expect(screen.queryByPlaceholderText(/SEPCAT/i)).not.toBeInTheDocument();
+  expect(screen.queryByLabelText(/SEPCAT/i)).not.toBeInTheDocument();
 });
