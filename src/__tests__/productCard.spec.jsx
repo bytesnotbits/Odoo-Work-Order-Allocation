@@ -76,6 +76,24 @@ describe('ProductCard – Add Asset button', () => {
   });
 });
 
+test('auto pending entry appears when remaining quantity exists', async () => {
+  renderProductCard({
+    getItemState: () => ({
+      base: {},
+      extra: { allocations: [] },
+      totalAvailable: 10,
+      allocatedSum: 0,
+      remaining: 3,
+      pendingReturnSum: 0,
+    }),
+  });
+
+  expect(screen.getByText(/Auto-generated pending balance/i)).toBeInTheDocument();
+  expect(
+    screen.getByText(/This entry represents 3 units still awaiting allocation\./i),
+  ).toBeInTheDocument();
+});
+
 test('saving a new reel span auto-creates a pending allocation', async () => {
   const user = userEvent.setup();
   const setReelSpan = vi.fn().mockReturnValue({ id: "SPAN-1", start: 100, end: 200 });

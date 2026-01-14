@@ -404,6 +404,25 @@ export default function ProductCard({
     ? "bg-white border-gray-200"
     : "bg-green-50 border-green-200";
 
+  const workOrderSlug = String(wo || "").replace(/\s+/g, "-");
+  const productSlug = String(product.code || "").replace(/\s+/g, "-");
+  const hasPendingReturnAllocations = pendingReturnSum > 0;
+  const shouldShowSyntheticPending = remaining > 0 && !hasPendingReturnAllocations;
+  const syntheticPendingAllocation = shouldShowSyntheticPending
+    ? {
+        id: `pending-${workOrderSlug}-${productSlug}`,
+        type: "regular",
+        allocationCategory: DEFAULT_PENDING_CATEGORY,
+        allocationCategoryIsCustom: false,
+        allocationId: "Auto pending",
+        qty: remaining,
+        __isPendingPlaceholder: true,
+      }
+    : null;
+  const allocationsToShow = syntheticPendingAllocation
+    ? [syntheticPendingAllocation, ...extra.allocations]
+    : extra.allocations;
+
   const totalPosted = Number(product.posted) || 0;
   const toAllocateTone = hasUnresolvedQuantities ? "red" : "green";
   const chipBase = "px-2 py-1 rounded-full border text-[11px] font-semibold uppercase tracking-wide";
@@ -732,12 +751,13 @@ export default function ProductCard({
           {/* RIGHT: Allocations (engineering can also capture asset meta) */}
           <div className={`rounded-xl p-3 border ${modeSectionBorder} ${modeSectionBg}`}>
             <div className={`font-medium mb-2 ${modeHeadingColor}`}>Allocations</div>
-            {extra.allocations.length === 0 ? (
+            {allocationsToShow.length === 0 ? (
             <div className={`text-sm ${modeNoteColor} py-3`}>No allocations yet.</div>
             ) : (
               <div className="space-y-3">
-                {extra.allocations.map((a) => {
-                const isPendingReturn = isPendingCategory(a.allocationCategory);
+                {allocationsToShow.map((a) => {
+                const isSyntheticPendingCard = Boolean(a.__isPendingPlaceholder);
+                const isPendingReturn = isSyntheticPendingCard || isPendingCategory(a.allocationCategory);
                 const isReturned = a.allocationCategory === "Returned";
                 const raw = (extra.assets && extra.assets[a.id]) || {};
                 const meta = typeof raw === "object"
@@ -763,27 +783,35 @@ export default function ProductCard({
                       ? "border-slate-200 bg-slate-100 text-slate-500"
                       : "border-slate-200 bg-white text-slate-900";
                   const inputBase = "w-full border rounded-lg px-2 py-1 text-sm";
-                const isSelectedAllocation = selectedAllocation?.id === a.id;
-                const selectionClasses = isSelectedAllocation ? "ring-2 ring-blue-500/50 shadow-lg" : "hover:shadow-md";
-                return (
-                    <div
-                      key={a.id}
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => handleSelectAllocation(a)}
-                      onKeyDown={(event) => {
+                const isSelectedAllocation = !isSyntheticPendingCard && selectedAllocation?.id === a.id;
+                const selectionClasses = isSelectedAllocation
+                  ? "ring-2 ring-blue-500/50 shadow-lg"
+                  : (isSyntheticPendingCard ? "" : "hover:shadow-md");
+                const interactive = !isSyntheticPendingCard;
+                const eventProps = interactive
+                  ? {
+                      role: "button",
+                      tabIndex: 0,
+                      onClick: () => handleSelectAllocation(a),
+                      onKeyDown: (event) => {
                         if (event.key === "Enter" || event.key === " ") {
                           event.preventDefault();
                           handleSelectAllocation(a);
                         }
-                      }}
-                      className={`rounded-2xl border p-3 shadow-sm ${cardColor} ${selectionClasses} cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500`}
+                      },
+                    }
+                  : {};
+                return (
+                    <div
+                      key={a.id}
+                      className={`rounded-2xl border p-3 shadow-sm ${cardColor} ${selectionClasses} ${interactive ? "cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500" : ""}`}
+                      {...eventProps}
                     >
                       <div className="flex items-center justify-between flex-wrap gap-2">
                         <div className="text-sm font-semibold">
                           {a.type === "reel" ? "Reel piece" : "Quantity allocation"}
                         </div>
-                        {!locked && (
+                        {!locked && !isSyntheticPendingCard && (
                           <button
                             type="button"
                             className="inline-flex items-center justify-center px-3 py-1 rounded-full border text-[11px] font-semibold uppercase tracking-wide transition"
@@ -796,6 +824,9 @@ export default function ProductCard({
                           >
                             {isPendingReturn ? "Pending" : "Revert to pending"}
                           </button>
+                        )}
+                        {isSyntheticPendingCard && (
+                          <div className="text-[11px] text-amber-700 mt-1">Auto-generated pending balance</div>
                         )}
                       </div>
                       {a.type === "reel" && (
@@ -934,6 +965,11 @@ export default function ProductCard({
                               </div>
                             </div>
                           )}
+                        </div>
+                      )}
+                      {isSyntheticPendingCard && (
+                        <div className="text-xs text-amber-700 mt-2">
+                          This entry represents {a.qty ?? 0} units still awaiting allocation.
                         </div>
                       )}
                     </div>
