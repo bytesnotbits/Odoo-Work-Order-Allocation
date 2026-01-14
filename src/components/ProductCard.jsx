@@ -399,6 +399,17 @@ export default function ProductCard({
     }
   };
 
+  const primeSyntheticPendingForm = (qty) => {
+    setSelectedAllocation(null);
+    setAllocId("");
+    setAllocQty(qty != null ? String(qty) : "");
+    setAllocCategory(DEFAULT_PENDING_CATEGORY);
+    setAllocCategoryCustom("");
+    setReelSerial("");
+    setOuter("");
+    setInner("");
+  };
+
   const hasUnresolvedQuantities = remaining > 0 || pendingReturnSum > 0;
   const cardStateClasses = hasUnresolvedQuantities
     ? "bg-white border-gray-200"
@@ -826,7 +837,19 @@ export default function ProductCard({
                           </button>
                         )}
                         {isSyntheticPendingCard && (
-                          <div className="text-[11px] text-amber-700 mt-1">Auto-generated pending balance</div>
+                          <div className="flex flex-wrap items-center gap-2 text-[11px] text-amber-700 mt-1">
+                            <span>Auto-generated pending balance</span>
+                            <button
+                              type="button"
+                              className="text-[11px] font-semibold underline decoration-amber-400 underline-offset-2 hover:text-amber-900"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                primeSyntheticPendingForm(a.qty);
+                              }}
+                            >
+                              Open pending for edit
+                            </button>
+                          </div>
                         )}
                       </div>
                       {a.type === "reel" && (

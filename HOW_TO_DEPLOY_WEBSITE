@@ -1,5 +1,11 @@
 Update Steps
 
 Make sure your working tree has the latest commits you want live (merge, test, etc.).
-Run npm run build to produce the production bundle in dist/.
-Push the bundle to GitHub Pages with npm run deploy (it invokes gh-pages -d dist); this updates the gh-pages branch that serves the site.
+# Run
+## npm run build
+to produce the production bundle in dist/.
+
+# Push the bundle to GitHub Pages with 
+## npm run deploy
+
+(it invokes gh-pages -d dist); this updates the gh-pages branch that serves the site.

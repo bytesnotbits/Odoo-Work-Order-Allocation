@@ -94,6 +94,26 @@ test('auto pending entry appears when remaining quantity exists', async () => {
   ).toBeInTheDocument();
 });
 
+test('open pending control primes the allocation form', async () => {
+  const user = userEvent.setup();
+  renderProductCard({
+    getItemState: () => ({
+      base: {},
+      extra: { allocations: [] },
+      totalAvailable: 10,
+      allocatedSum: 0,
+      remaining: 3,
+      pendingReturnSum: 0,
+    }),
+  });
+  const editButton = screen.getByRole('button', { name: /open pending for edit/i });
+  await user.click(editButton);
+  const quantityInput = screen.getByRole('spinbutton');
+  expect(quantityInput.value).toBe("3");
+  const categorySelect = screen.getByRole('combobox');
+  expect(categorySelect.value).toBe("Pending");
+});
+
 test('saving a new reel span auto-creates a pending allocation', async () => {
   const user = userEvent.setup();
   const setReelSpan = vi.fn().mockReturnValue({ id: "SPAN-1", start: 100, end: 200 });
