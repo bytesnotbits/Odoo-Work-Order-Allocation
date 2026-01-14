@@ -17,6 +17,11 @@ export default function WOView({
   const [searchTerm, setSearchTerm] = useState("");
   const products = Array.from(gm.values()).sort((a, b) => naturalCompare(a.code, b.code));
   const isMiscProduct = (product) => isMiscProductCode(product.code);
+  const isAccountingMode = tab === "accounting";
+  const miscCardBorder = isAccountingMode ? "border-rose-200" : "border-slate-200";
+  const miscCardBg = isAccountingMode ? "bg-rose-50" : "bg-slate-50";
+  const miscCardText = isAccountingMode ? "text-rose-900" : "text-slate-600";
+  const miscNoteText = isAccountingMode ? "text-xs text-rose-600" : "text-xs text-slate-500";
   const productStates = products.map((product) => ({ product, state: getItemState(wo, product.code) }));
   const allocatableStates = productStates.filter(({ product }) => !isMiscProduct(product));
   const allAllocated = allocatableStates.every(({ state }) => state.remaining === 0);
@@ -93,10 +98,10 @@ export default function WOView({
         <div className="text-sm text-gray-600">No items match that search.</div>
       )}
 
-      <div className="space-y-2 rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
+      <div className={`space-y-2 rounded-2xl border border-dashed p-3 text-sm ${miscCardBorder} ${miscCardBg} ${miscCardText}`}>
         <div className="flex items-center justify-between">
-          <div className="font-medium text-slate-900">Add miscellaneous material</div>
-          <div className="text-xs text-slate-500">Provisional only</div>
+          <div className={`font-medium ${isAccountingMode ? "text-rose-900" : "text-slate-900"}`}>Add miscellaneous material</div>
+          <div className={miscNoteText}>Provisional only</div>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row">
           <input

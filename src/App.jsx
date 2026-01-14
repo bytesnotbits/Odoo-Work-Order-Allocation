@@ -1044,7 +1044,12 @@ export default function App() {
 
         {activeWO ? (
           <>
-            <Section title={`Materials for WO ${activeWO}`} subtitle={activeWODescription} icon={Split}>
+            <Section
+              title={`Materials for WO ${activeWO}`}
+              subtitle={activeWODescription}
+              icon={Split}
+              variant={tab}
+            >
               <WOView
                 wo={activeWO}
                 grouped={groupedWithMisc}

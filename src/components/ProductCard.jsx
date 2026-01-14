@@ -84,6 +84,14 @@ export default function ProductCard({
   const isMiscProduct = isMiscProductCode(product.code);
   const productGroupLabel = String(product.group || "").trim().toUpperCase();
   const isScxrProduct = productGroupLabel === "SCXR";
+  const isAccountingMode = tab === "accounting";
+  const modeSectionBorder = isAccountingMode ? "border-rose-200" : "border-slate-200";
+  const modeSectionBg = isAccountingMode ? "bg-rose-50" : "bg-gray-50";
+  const modeHeadingColor = isAccountingMode ? "text-rose-900" : "text-slate-900";
+  const modeNoteColor = isAccountingMode ? "text-rose-600" : "text-slate-600";
+  const modeBadgeClass = isAccountingMode
+    ? "border-rose-200 bg-rose-100 text-rose-800"
+    : "border-slate-200 bg-white text-slate-600";
   const [allocQty, setAllocQty] = useState("");
   const [allocId, setAllocId] = useState("");
   const [allocCategory, setAllocCategory] = useState(ALLOCATION_OPTIONS[0]);
@@ -464,11 +472,18 @@ export default function ProductCard({
         )}
       </div>
 
-      {tab === "engineering" && (
-        <div className="mt-4 grid md:grid-cols-2 gap-4">
+      <div className="mt-3">
+        <span
+          className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-wide ${modeBadgeClass}`}
+        >
+          {isAccountingMode ? "Accounting form" : "Engineering form"}
+        </span>
+      </div>
+
+      <div className="mt-4 grid md:grid-cols-2 gap-4">
           {/* LEFT: Add allocation (unchanged) */}
-          <div className="bg-gray-50 rounded-xl p-3 border">
-            <div className="font-medium mb-2">Add allocation</div>
+          <div className={`rounded-xl p-3 border ${modeSectionBorder} ${modeSectionBg}`}>
+            <div className={`font-medium mb-2 ${modeHeadingColor}`}>Add allocation</div>
 
             <div className="flex items-center gap-2 mb-3">
               <label className="text-sm font-medium">Track by reel?</label>
@@ -715,10 +730,10 @@ export default function ProductCard({
           </div>
 
           {/* RIGHT: Allocations (engineering can also capture asset meta) */}
-          <div className="bg-gray-50 rounded-xl p-3 border">
-            <div className="font-medium mb-2">Allocations</div>
+          <div className={`rounded-xl p-3 border ${modeSectionBorder} ${modeSectionBg}`}>
+            <div className={`font-medium mb-2 ${modeHeadingColor}`}>Allocations</div>
             {extra.allocations.length === 0 ? (
-              <div className="text-sm text-gray-600 py-3">No allocations yet.</div>
+            <div className={`text-sm ${modeNoteColor} py-3`}>No allocations yet.</div>
             ) : (
               <div className="space-y-3">
                 {extra.allocations.map((a) => {
@@ -928,137 +943,6 @@ export default function ProductCard({
             )}
           </div>
         </div>
-      )}
-
-      {tab === "accounting" && (
-        <div className="mt-4 bg-gray-50 rounded-xl p-3 border overflow-x-auto">
-          {extra.allocations.length === 0 ? (
-            <div className="text-sm text-gray-600">No allocations to assign assets.</div>
-          ) : (
-            <table className="min-w-[960px] sm:min-w-full text-sm">
-              <thead>
-                <tr className="text-left text-gray-600">
-                  <th className="py-1 pr-3">Type</th>
-                  <th className="py-1 pr-3">Qty/Footage</th>
-                  <th className="py-1 pr-3">Outer</th>
-                  <th className="py-1 pr-3">Inner</th>
-                  <th className="py-1 pr-3">Allocation Notes</th>
-                  <th className="py-1 pr-3">Category</th>
-                  <th className="py-1 pr-3">Reel/Serial</th>
-                  <th className="py-1 pr-3">Asset ID</th>
-                  <th className="py-1 pr-3">COE LOC</th>
-                  <th className="py-1 pr-3">RACK/BAY</th>
-                  <th className="py-1 pr-3">SEPCAT</th>
-                </tr>
-              </thead>
-              <tbody>
-                {extra.allocations.map((a) => {
-                  const meta = (extra.assets && extra.assets[a.id]) || {};
-                  const assetMeta = typeof meta === 'object' ? meta : { assetId: meta ?? '', coeLoc: '', rackBay: '', sepcat: '' };
-                  const assetCopyKey = (field) => `${a.id}|${field}`;
-                  const categoryNormalized = (a.allocationCategory ?? "").trim().toLowerCase();
-                  const isCustomAllocation = Boolean(a.allocationCategoryIsCustom) || categoryNormalized === "custom";
-                  const isSuppressedCategory = ASSET_META_SUPPRESSED_CATEGORIES.has(categoryNormalized);
-                  const hideAssetFields = isCustomAllocation || isSuppressedCategory;
-                  const hideCoeFields = hideAssetFields || !isScxrProduct;
-                  return (<tr key={a.id} className="border-t">
-                    <td className="py-1 pr-3">{a.type}</td>
-                    <td className="py-1 pr-3">{a.type === "reel" ? a.footage : a.qty}</td>
-                    <td className="py-1 pr-3">{a.type === "reel" ? a.outer : ""}</td>
-                    <td className="py-1 pr-3">{a.type === "reel" ? a.inner : ""}</td>
-                    <td className="py-1 pr-3">{a.allocationId}</td>
-                    <td className="py-1 pr-3">{a.allocationCategory || ""}</td>
-                    <td className="py-1 pr-3">{a.reelSerial || ""}</td>
-                    <td className="py-1 pr-3">
-                      {hideAssetFields ? (
-                        <span className="text-slate-400">—</span>
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <input className="border rounded-lg p-1 w-40 flex-shrink-0" placeholder="Asset ID"
-                            value={assetMeta.assetId || ''}
-                            onChange={(e) => setAssetMeta(wo, product.code, a.id, { assetId: e.target.value })} />
-                          {assetMeta.assetId && (
-                            <button
-                              type="button"
-                              className={`${copyChipClasses} ${copyChipTruncate}`}
-                              onClick={() => copyAssetField("assetId", assetMeta.assetId, assetCopyKey("assetId"))}
-                              aria-label="Copy Asset ID"
-                            >
-                              {copiedMetaKey === assetCopyKey("assetId") ? "Copied!" : assetMeta.assetId}
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </td>
-                    <td className="py-1 pr-3">
-                      {hideCoeFields ? (
-                        <span className="text-slate-400">—</span>
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <input className="border rounded-lg p-1 w-32 flex-shrink-0" placeholder="COE LOC"
-                            value={assetMeta.coeLoc || ''}
-                            onChange={(e) => setAssetMeta(wo, product.code, a.id, { coeLoc: e.target.value })} />
-                          {assetMeta.coeLoc && (
-                            <button
-                              type="button"
-                              className={`${copyChipClasses} ${copyChipTruncate}`}
-                              onClick={() => copyAssetField("coeLoc", assetMeta.coeLoc, assetCopyKey("coeLoc"))}
-                              aria-label="Copy COE LOC"
-                            >
-                              {copiedMetaKey === assetCopyKey("coeLoc") ? "Copied!" : assetMeta.coeLoc}
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </td>
-                    <td className="py-1 pr-3">
-                      {hideCoeFields ? (
-                        <span className="text-slate-400">—</span>
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <input className="border rounded-lg p-1 w-32 flex-shrink-0" placeholder="RACK/BAY"
-                            value={assetMeta.rackBay || ''}
-                            onChange={(e) => setAssetMeta(wo, product.code, a.id, { rackBay: e.target.value })} />
-                          {assetMeta.rackBay && (
-                            <button
-                              type="button"
-                              className={`${copyChipClasses} ${copyChipTruncate}`}
-                              onClick={() => copyAssetField("rackBay", assetMeta.rackBay, assetCopyKey("rackBay"))}
-                              aria-label="Copy Rack/Bay"
-                            >
-                              {copiedMetaKey === assetCopyKey("rackBay") ? "Copied!" : assetMeta.rackBay}
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </td>
-                    <td className="py-1 pr-3">
-                      {hideCoeFields ? (
-                        <span className="text-slate-400">—</span>
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <input className="border rounded-lg p-1 w-28 flex-shrink-0" placeholder="SEPCAT"
-                            value={assetMeta.sepcat || ''}
-                            onChange={(e) => setAssetMeta(wo, product.code, a.id, { sepcat: e.target.value })} />
-                          {assetMeta.sepcat && (
-                            <button
-                              type="button"
-                              className={`${copyChipClasses} ${copyChipTruncate}`}
-                              onClick={() => copyAssetField("sepcat", assetMeta.sepcat, assetCopyKey("sepcat"))}
-                              aria-label="Copy SEPCAT"
-                            >
-                              {copiedMetaKey === assetCopyKey("sepcat") ? "Copied!" : assetMeta.sepcat}
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </td>
-                  </tr>)})}
-               </tbody>
-             </table>
-           )}
-         </div>
-       )}
     </div>
   );
 }
