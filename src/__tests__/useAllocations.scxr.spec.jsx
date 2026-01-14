@@ -15,17 +15,17 @@ beforeEach(() => {
 });
 afterEach(() => vi.restoreAllMocks());
 
-test('SCXR requires Asset ID + COE LOC + RACK/BAY + SEPCAT', () => {
+test('SCXR requires COE LOC + RACK/BAY + SEPCAT', () => {
   const grouped = makeGrouped();
   const { result } = renderHook(() => useAllocations(grouped));
   // add one reel piece covering all available
   act(() => {
     result.current.upsertAllocation('WO1','111', { type:'reel', outer:0, inner:1, footage:1, allocationId:'R1', reelSerial:'REEL-1' });
   });
-  // Set only Asset ID -> leave COE fields missing
+  // Leave COE fields missing
   const alloc = result.current.getItemState('WO1','111').extra.allocations[0];
   act(() => {
-    result.current.setAssetMeta('WO1','111', alloc.id, { assetId:'AS-1' });
+    result.current.setAssetMeta('WO1','111', alloc.id, {});
   });
   act(() => { result.current.lockWorkOrder('WO1'); });
   const msg = window.alert.mock.calls[0][0];
@@ -43,7 +43,7 @@ test('SCXR passes when all COE fields provided', () => {
   });
   const alloc = result.current.getItemState('WO1','111').extra.allocations[0];
   act(() => {
-    result.current.setAssetMeta('WO1','111', alloc.id, { assetId:'AS-1', coeLoc:'LOC1', rackBay:'R1B2', sepcat:'CAT-A' });
+    result.current.setAssetMeta('WO1','111', alloc.id, { coeLoc:'LOC1', rackBay:'R1B2', sepcat:'CAT-A' });
   });
   act(() => { result.current.lockWorkOrder('WO1'); });
   // Should alert "marked complete" or at least not contain SCXR error

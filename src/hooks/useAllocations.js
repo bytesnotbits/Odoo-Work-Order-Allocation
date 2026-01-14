@@ -319,7 +319,8 @@ export function useAllocations(grouped) {
       const state = buildReelState(allocState[k] || {});
       // determine SCXR from grouped data
       const base = grouped.get(wo)?.get(code);
-      const isSCXR = (base?.group || '') === 'SCXR';
+      const baseGroup = String(base?.group || '').trim().toUpperCase();
+      const isSCXR = baseGroup.includes('SCXR');
     for (const a of state.allocations) {
       if (!isSCXR) continue;
       const v = state.assets[a.id];
@@ -327,7 +328,6 @@ export function useAllocations(grouped) {
         ? v
         : { assetId: v ?? "", coeLoc: "", rackBay: "", sepcat: "" };
       const missing = [];
-      if (!meta.assetId) missing.push("Asset ID");
       if (!meta.coeLoc)  missing.push("COE LOC");
       if (!meta.rackBay) missing.push("RACK/BAY");
       if (!meta.sepcat)  missing.push("SEPCAT");
