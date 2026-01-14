@@ -47,6 +47,8 @@ export function sanitizeHistoryEntries(entries) {
       status: isValidStatus(entry.status) ? entry.status : DEFAULT_STATUS,
       createdAt: entry.createdAt || "",
       updatedAt: entry.updatedAt || "",
+      modifiedBy: entry.modifiedBy || "",
+      modifiedAt: entry.modifiedAt || entry.updatedAt || "",
     }));
 }
 

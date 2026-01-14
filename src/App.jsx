@@ -15,7 +15,9 @@ import { buildStatePayload, downloadStateJson, readStateJson } from "./utils/sta
 import { loadPersistedState, savePersistedState } from "./utils/statePersistence";
 import { WORK_ORDER_HISTORY_STATUSES } from "./utils/workOrderHistory";
 import { useWorkOrderHistory } from "./hooks/useWorkOrderHistory";
+import { useAuditTrail } from "./hooks/useAuditTrail";
 import { naturalCompare } from "./lib/natural";
+import { loadUserIdentity, persistUserIdentity } from "./utils/identityStorage";
 
 const HISTORY_STATUS_FILTERS = [
   { value: "all", label: "All" },
@@ -39,6 +41,9 @@ export default function App() {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [allowImplicitSelection, setAllowImplicitSelection] = useState(true);
   const searchWrapperRef = useRef(null);
+  const [userIdentity, setUserIdentity] = useState(() => loadUserIdentity());
+  const lastViewedWorkOrderRef = useRef("");
+  const [showAuditPanel, setShowAuditPanel] = useState(false);
   useEffect(() => {
     const handleClick = (event) => {
       if (searchWrapperRef.current && !searchWrapperRef.current.contains(event.target)) {
@@ -48,6 +53,10 @@ export default function App() {
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
+
+  useEffect(() => {
+    persistUserIdentity(userIdentity);
+  }, [userIdentity]);
 
   const [miscEntries, setMiscEntries] = useState({});
   const [workOrderNotes, setWorkOrderNotes] = useState({});
@@ -93,6 +102,42 @@ export default function App() {
     clearHistory,
     setEntryStatus,
   } = useWorkOrderHistory();
+  const { entries: auditEntries, recordAuditEvent } = useAuditTrail();
+
+  const userDisplayName = userIdentity.name || userIdentity.email || "Unknown user";
+
+  const logAuditEvent = useCallback(
+    (workOrderId, action, details = "") => {
+      if (!workOrderId || !action) return;
+      recordAuditEvent({
+        workOrderId,
+        action,
+        details,
+        modifiedBy: userDisplayName,
+      });
+    },
+    [recordAuditEvent, userDisplayName],
+  );
+
+  const describeAllocationPayload = useCallback(
+    (wo, code, payload) => {
+      if (!payload) return "";
+      const typeLabel = payload.type === "reel" ? "Reel piece" : "Quantity allocation";
+      const amount =
+        payload.type === "reel"
+          ? payload.footage ?? `${payload.outer ?? ""}-${payload.inner ?? ""}`
+          : payload.qty;
+      let description = `${typeLabel} ${amount ?? ""}`.trim();
+      if (payload.reelSerial) description += ` on ${payload.reelSerial}`;
+      if (payload.allocationCategory) description += ` as ${payload.allocationCategory}`;
+      const product = groupedWithMisc.get(wo)?.get(code);
+      const itemNumber = product?.code || code;
+      const itemDesc = product?.desc ? ` ${product.desc}` : "";
+      const label = `[${itemNumber}]${itemDesc}`;
+      return `${label} — ${description}`.trim();
+    },
+    [groupedWithMisc],
+  );
 
   const normalizeMiscItemNumber = (raw) => {
     if (!raw) return "";
@@ -114,6 +159,14 @@ export default function App() {
 
   const normalizeRecord = (value) => (value && typeof value === "object" ? value : {});
 
+  const parseTimestampValue = (value) => {
+    const parsed = Date.parse(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+
+  const handleIdentityChange = (field, value) => {
+    setUserIdentity((prev) => ({ ...prev, [field]: String(value || "") }));
+  };
   const setBaselinePayload = (payload) => {
     lastSavedPayloadRef.current = JSON.stringify(payload);
     setHasUnsavedChanges(false);
@@ -222,6 +275,87 @@ export default function App() {
     addReelAllocation,
     updateAllocation,
   } = useAllocations(groupedWithMisc);
+
+  const handleUpsertAllocation = useCallback(
+    (wo, code, payload) => {
+      upsertAllocation(wo, code, payload);
+      if (!wo || !payload) return;
+      const detail = describeAllocationPayload(wo, code, payload);
+      logAuditEvent(wo, "Recorded allocation", detail);
+    },
+    [upsertAllocation, describeAllocationPayload, logAuditEvent],
+  );
+
+  const handleUpdateAllocation = useCallback(
+    (wo, code, allocId, payload) => {
+      updateAllocation(wo, code, allocId, payload);
+      if (!wo || !allocId) return;
+      logAuditEvent(wo, "Updated allocation", `Allocation ${allocId} updated`);
+    },
+    [updateAllocation, logAuditEvent],
+  );
+
+  const handleRemoveAllocation = useCallback(
+    (wo, code, id) => {
+      removeAllocation(wo, code, id);
+      if (!wo || !id) return;
+      logAuditEvent(wo, "Removed allocation", `Allocation ${id} removed`);
+    },
+    [logAuditEvent, removeAllocation],
+  );
+
+  const handleAddReelAllocation = useCallback(
+    (wo, code, payload, options) => {
+      const result = addReelAllocation?.(wo, code, payload, options);
+      if (result && !result.error) {
+        logAuditEvent(wo, "Recorded allocation", describeAllocationPayload(wo, code, payload));
+      }
+      return result;
+    },
+    [addReelAllocation, describeAllocationPayload, logAuditEvent],
+  );
+
+  const handleSetAssetMeta = useCallback(
+    (wo, code, allocId, fields) => {
+      setAssetMeta(wo, code, allocId, fields);
+      if (!wo || !allocId || !fields) return;
+      const changedFields = Object.keys(fields).filter((key) => {
+        const value = fields[key];
+        return value !== null && value !== undefined && value !== "";
+      });
+      if (changedFields.length === 0) return;
+      logAuditEvent(
+        wo,
+        "Captured asset metadata",
+        `Updated ${changedFields.join(", ")} for allocation ${allocId}`,
+      );
+    },
+    [setAssetMeta, logAuditEvent],
+  );
+
+  const handleSetReelSpan = useCallback(
+    (wo, code, serial, start, end, options) => {
+      const savedSpan = setReelSpan(wo, code, serial, start, end, options);
+      if (savedSpan) {
+        logAuditEvent(
+          wo,
+          "Saved reel span",
+          `Span [${savedSpan.start}–${savedSpan.end}] on ${serial}`,
+        );
+      }
+      return savedSpan;
+    },
+    [setReelSpan, logAuditEvent],
+  );
+
+  const handleRemoveReelSpan = useCallback(
+    (wo, code, serial) => {
+      removeReelSpan(wo, code, serial);
+      if (!wo || !serial) return;
+      logAuditEvent(wo, "Removed reel span", `Span removed for ${serial}`);
+    },
+    [removeReelSpan, logAuditEvent],
+  );
 
   useEffect(() => {
     let canceled = false;
@@ -429,8 +563,27 @@ export default function App() {
     (entry) => entry.id !== featuredHistoryEntry?.id,
   );
   const dropdownSuggestions = otherHistoryEntries.slice(0, DROPDOWN_SUGGESTION_LIMIT);
+  const auditEntriesForActive = useMemo(() => {
+    if (!activeWO) return [];
+    return auditEntries
+      .filter((entry) => entry.workOrderId === activeWO)
+      .sort(
+        (a, b) =>
+          parseTimestampValue(b.modifiedAt) - parseTimestampValue(a.modifiedAt),
+      )
+      .slice(0, 5);
+  }, [activeWO, auditEntries]);
   useEffect(() => {
-    if (!isHydrated || !activeWO) return;
+    if (!activeWO) {
+      setShowAuditPanel(false);
+    }
+  }, [activeWO]);
+  useEffect(() => {
+    if (!isHydrated) return;
+    if (!activeWO) {
+      lastViewedWorkOrderRef.current = "";
+      return;
+    }
     const payload = buildWorkOrderSnapshot(activeWO);
     if (!payload) return;
     upsertHistoryEntry({
@@ -438,8 +591,26 @@ export default function App() {
       description: activeWODescription,
       lastOpened: new Date().toISOString(),
       snapshot: payload,
+      modifiedBy: userDisplayName,
     });
-  }, [activeWO, activeWODescription, buildWorkOrderSnapshot, isHydrated, upsertHistoryEntry]);
+    if (lastViewedWorkOrderRef.current !== activeWO) {
+      recordAuditEvent({
+        workOrderId: activeWO,
+        action: "Viewed work order",
+        details: activeWODescription || "Opened work order snapshot",
+        modifiedBy: userDisplayName,
+      });
+      lastViewedWorkOrderRef.current = activeWO;
+    }
+  }, [
+    activeWO,
+    activeWODescription,
+    buildWorkOrderSnapshot,
+    isHydrated,
+    upsertHistoryEntry,
+    recordAuditEvent,
+    userDisplayName,
+  ]);
 
   const handleHistoryEntryPurge = (entryId) => {
     if (!entryId) return;
@@ -458,6 +629,17 @@ export default function App() {
     } catch {
       return String(value);
     }
+  };
+
+  const handleHistoryStatusChange = (entry, status) => {
+    if (!entry || !status) return;
+    setEntryStatus(entry.id, status, userDisplayName);
+    recordAuditEvent({
+      workOrderId: entry.id,
+      action: "Updated work order status",
+      details: `Status changed to ${status}`,
+      modifiedBy: userDisplayName,
+    });
   };
 
   const snapshotSourceLabel = localSnapshot?.source === "indexedDB" ? "IndexedDB" : "browser storage";
@@ -490,10 +672,13 @@ export default function App() {
           {entry.description || "No description available"} · Last opened{" "}
           {formatTimestamp(entry.lastOpened)}
         </div>
+        {entry.modifiedBy && (
+          <div className="mt-1 text-xs text-slate-500">Last modified by {entry.modifiedBy}</div>
+        )}
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <select
             value={entry.status}
-            onChange={(event) => setEntryStatus(entry.id, event.target.value)}
+            onChange={(event) => handleHistoryStatusChange(entry, event.target.value)}
             className="rounded-xl border border-slate-200 bg-white px-2 py-1 text-xs focus:border-slate-900"
           >
             {WORK_ORDER_HISTORY_STATUSES.map((statusOption) => (
@@ -577,6 +762,40 @@ export default function App() {
             Upload your <em>Sales Order (sale.order)</em> export, review posted vs. returned quantities, allocate materials (including cable reels), and hand off to accounting for Asset IDs.
           </p>
         </motion.header>
+
+        <div className="mb-6 bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <div className="font-medium">Current user (manual entry)</div>
+              <div className="text-xs text-slate-500">
+                Capture your name/email for audit trail testing until Azure AD (MSAL) is wired up.
+              </div>
+            </div>
+            <span className="text-xs text-slate-500">Actor: {userDisplayName}</span>
+          </div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <label className="space-y-1 text-xs text-slate-500">
+              Name
+              <input
+                type="text"
+                value={userIdentity.name}
+                placeholder="Engineer or accountant name"
+                onChange={(event) => handleIdentityChange("name", event.target.value)}
+                className="w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:border-slate-900 focus:ring-0"
+              />
+            </label>
+            <label className="space-y-1 text-xs text-slate-500">
+              Email
+              <input
+                type="email"
+                value={userIdentity.email}
+                placeholder="name@example.com"
+                onChange={(event) => handleIdentityChange("email", event.target.value)}
+                className="w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:border-slate-900 focus:ring-0"
+              />
+            </label>
+          </div>
+        </div>
 
         <div className="mb-6 flex flex-wrap items-center gap-3 text-xs">
           <div
@@ -752,10 +971,20 @@ export default function App() {
               )}
             </div>
 
-            <div className="text-xs text-slate-500">
-              {otherHistoryEntries.length === 0
-                ? "No other work orders match the current filters."
-                : `${otherHistoryEntries.length} other work order${otherHistoryEntries.length === 1 ? "" : "s"} available via search.`}
+            <div className="mt-2 flex items-center justify-between gap-3">
+              <div className="text-xs text-slate-500">
+                {otherHistoryEntries.length === 0
+                  ? "No other work orders match the current filters."
+                  : `${otherHistoryEntries.length} other work order${otherHistoryEntries.length === 1 ? "" : "s"} available via search.`}
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAuditPanel(true)}
+                disabled={!activeWO}
+                className="text-xs font-semibold text-slate-500 hover:text-slate-900 disabled:opacity-40"
+              >
+                View audit trail
+              </button>
             </div>
 
             {/* Mode (segmented control) */}
@@ -821,18 +1050,18 @@ export default function App() {
                 grouped={groupedWithMisc}
                 baseGrouped={grouped}
                 getItemState={getItemState}
-                upsertAllocation={upsertAllocation}
-                removeAllocation={removeAllocation}
-                setAssetMeta={setAssetMeta}
-                setReelSpan={setReelSpan}
-                removeReelSpan={removeReelSpan}
+                upsertAllocation={handleUpsertAllocation}
+                removeAllocation={handleRemoveAllocation}
+                setAssetMeta={handleSetAssetMeta}
+                setReelSpan={handleSetReelSpan}
+                removeReelSpan={handleRemoveReelSpan}
                 getReelSpan={getReelSpan}
                 listReels={listReels}
                 getReelSpanMap={getReelSpanMap}
                 lockWorkOrder={lockWorkOrder}
                 setCableMode={setCableMode}
-                addReelAllocation={addReelAllocation}
-                updateAllocation={updateAllocation}
+                addReelAllocation={handleAddReelAllocation}
+                updateAllocation={handleUpdateAllocation}
                 tab={tab}
                 allocState={allocState}
                 addMiscEntry={(itemNumber, description) => registerMiscEntry(activeWO, itemNumber, description)} // ensures function bound to current work order
@@ -852,6 +1081,54 @@ export default function App() {
           <div className="text-gray-600">No work orders found in the file.</div>
         )}
       </div>
+      {showAuditPanel && (
+        <div className="fixed inset-0 z-40 flex items-center justify-end">
+          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setShowAuditPanel(false)} />
+          <div className="relative z-10 h-full max-w-md border-l border-slate-200 bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+              <div>
+                <div className="text-sm font-semibold text-slate-900">Audit trail</div>
+                <p className="text-xs text-slate-500">
+                  Read-only log for {activeWO || "no work order selected"}.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAuditPanel(false)}
+                className="text-xs font-semibold text-slate-500 hover:text-slate-900"
+              >
+                Close
+              </button>
+            </div>
+            <div className="flex h-full flex-col space-y-3 overflow-auto p-4">
+              {activeWO ? (
+                auditEntriesForActive.length === 0 ? (
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-500">
+                    No audit records yet. Actions like allocations or status changes will appear here.
+                  </div>
+                ) : (
+                  auditEntriesForActive.map((event) => (
+                    <div key={event.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700">
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-slate-900">{event.action}</span>
+                        <span className="text-slate-500">{formatTimestamp(event.modifiedAt)}</span>
+                      </div>
+                      <div className="text-xs text-slate-500">
+                        {event.details || "No additional context"}
+                      </div>
+                      <div className="text-xs text-slate-500">By {event.modifiedBy || "Unknown user"}</div>
+                    </div>
+                  ))
+                )
+              ) : (
+                <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-xs text-slate-500">
+                  Load a work order to view its audit trail.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -54,21 +54,23 @@ export function useWorkOrderHistory() {
     setEntries([]);
   }, []);
 
-  const setEntryStatus = useCallback((id, status) => {
+  const setEntryStatus = useCallback((id, status, actor) => {
     if (!id || !status) return;
     setEntries((prev) =>
-      prev.map((entry) =>
-        entry.id === id
-          ? {
-              ...entry,
-              status:
-                WORK_ORDER_HISTORY_STATUSES.some((value) => value.value === status)
-                  ? status
-                  : entry.status,
-              updatedAt: new Date().toISOString(),
-            }
-          : entry,
-      ),
+      prev.map((entry) => {
+        if (entry.id !== id) return entry;
+        const now = new Date().toISOString();
+        return {
+          ...entry,
+          status:
+            WORK_ORDER_HISTORY_STATUSES.some((value) => value.value === status)
+              ? status
+              : entry.status,
+          updatedAt: now,
+          modifiedAt: now,
+          modifiedBy: actor || entry.modifiedBy || "",
+        };
+      }),
     );
   }, []);
 
