@@ -5,8 +5,6 @@
 - Request: allow accountants to unlock/return a work order if issues are found so engineers can adjust allocations again. Potential approach: add `unlockWorkOrder` in the hook, expose it to `App`, and provide a “Return to engineering” control (e.g., tied to history entry status changes) so the two sides coordinate around an explicit status transition.
 
 ### Notifications & Audit Trail
-- Only browser alerts currently exist; no persisted notification log or audit trail.
-- Desired feature: record who changed what and when. History entries already persist snapshots and status in `wo-allocation-history` (`src/utils/workOrderHistory.js`), so we can extend each entry with `modifiedBy`/`modifiedAt` sourced from the signed-in user.
 - Future plan: tie the status history changes (open → submitted → returned) to both an unlock flow and a notification system so accounting gets notified when a work order is ready or returned.
 
 ### User Identity Integration
@@ -22,5 +20,4 @@
 
 ### Summary & Next Steps
 1. Build an unlock path tied to history status transitions so accountants can “return” WOs cleanly.
-2. Extend history entries to capture user identity and timestamps for future audit needs.
-3. Integrate Azure AD authentication for user context and use the same identity to drive MS Teams notifications when statuses change.
+2. Integrate Azure AD authentication for user context and use the same identity to drive MS Teams notifications when statuses change.

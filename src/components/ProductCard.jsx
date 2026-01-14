@@ -12,6 +12,7 @@ import { Plus, Trash2, Ruler } from "lucide-react";
 
 const DEFAULT_PENDING_CATEGORY =
   ALLOCATION_OPTIONS.find((option) => option.toLowerCase() === "pending") || "Pending";
+const SYNTHETIC_PLACEHOLDER_CATEGORY = "PLACEHOLDER";
 
 const ASSET_META_SUPPRESSED_CATEGORIES = new Set(["pending", "returned", "expense"]);
 
@@ -423,9 +424,9 @@ export default function ProductCard({
     ? {
         id: `pending-${workOrderSlug}-${productSlug}`,
         type: "regular",
-        allocationCategory: DEFAULT_PENDING_CATEGORY,
+        allocationCategory: SYNTHETIC_PLACEHOLDER_CATEGORY,
         allocationCategoryIsCustom: false,
-        allocationId: "Auto pending",
+        allocationId: "Auto Generated",
         qty: remaining,
         __isPendingPlaceholder: true,
       }
@@ -847,7 +848,7 @@ export default function ProductCard({
                                 primeSyntheticPendingForm(a.qty);
                               }}
                             >
-                              Open pending for edit
+                              Edit
                             </button>
                           </div>
                         )}
