@@ -26,3 +26,15 @@
 - Capture every workflow step, UI affordance, and decision path inside a structured “user manual” that an AI chatbot can ingest (think JSON, markdown, or another consistent schema). The manual should describe: how to load work orders, interpret each dashboard panel, add/remove allocations (including synthetic placeholders), work with reels/spans, manage misc assets, and handle edge cases noted in the app today.
 - The chatbot would then be able to answer user questions or walk them through specific tasks (“How do I convert a pending allocation to a reel?”) by referencing the manual, ensuring consistent, step-by-step guidance without requiring an engineer to study a manual in order to utilize the app.
 - Maybe have a portion of the app house a chatwindow the user can use to access HCTC's internal AI suite for convenience.
+
+## New Features/Enhancements
+### Add a span lineage visualization so the user can easily visualize how each span is broken up into pieces.
+
+### Connect Odoo via API and pull all the material moves involving work orders.
+#### Create a comparison between, what Odoo shows to be charged, what was actually charged. This shoudl take returns into account.
+
+### Connect to NISC via API so that the work order data is automatically populated in real-time and does not require the user to upload CSVs manually.
+
+### Create a centralized database that becomes one source of truth.
+
+### Setup MS Teams messaging and MS Azure authentication

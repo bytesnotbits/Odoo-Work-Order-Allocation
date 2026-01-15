@@ -170,6 +170,69 @@ export default function ProductCard({
       setSelectedSpanId("");
     }
   };
+  const buildReelTimeline = (spans) => {
+    if (!Array.isArray(spans) || spans.length === 0) return null;
+    const validSpans = spans
+      .filter(
+        (span) =>
+          span &&
+          Number.isFinite(span.start) &&
+          Number.isFinite(span.end) &&
+          span.end > span.start,
+      )
+      .sort((a, b) => (a.start || 0) - (b.start || 0) || (a.end || 0) - (b.end || 0));
+    if (validSpans.length === 0) return null;
+    const minStart = validSpans.reduce((min, span) => Math.min(min, span.start), Number.POSITIVE_INFINITY);
+    const maxEnd = validSpans.reduce((max, span) => Math.max(max, span.end), Number.NEGATIVE_INFINITY);
+    if (!Number.isFinite(minStart) || !Number.isFinite(maxEnd) || maxEnd <= minStart) return null;
+    const totalSpan = maxEnd - minStart;
+    const segments = validSpans.map((span) => ({
+      ...span,
+      startPercent: ((span.start - minStart) / totalSpan) * 100,
+      widthPercent: ((span.end - span.start) / totalSpan) * 100,
+      label: `[${span.start}–${span.end}]`,
+    }));
+    return { minStart, maxEnd, totalSpan, segments };
+  };
+  const getAllocationSegmentClass = (allocation) => {
+    if (isPendingAllocation(allocation)) {
+      return "bg-amber-400/90 border border-amber-300/80";
+    }
+    if ((allocation.allocationCategory || "").trim().toLowerCase() === "returned") {
+      return "bg-slate-400/90 border border-slate-300/80";
+    }
+    return "bg-sky-500/90 border border-sky-400/80";
+  };
+  const buildAllocationSegments = (serial, minStart, maxEnd) => {
+    if (!serial || !Number.isFinite(minStart) || !Number.isFinite(maxEnd) || maxEnd <= minStart) return [];
+    const serialKey = normalizeSerialKey(serial);
+    const totalSpan = maxEnd - minStart;
+    return (extra.allocations || [])
+      .filter(
+        (alloc) =>
+          alloc?.type === "reel" &&
+          Number.isFinite(alloc.outer) &&
+          Number.isFinite(alloc.inner) &&
+          normalizeSerialKey(alloc.reelSerial) === serialKey,
+      )
+      .map((alloc, idx) => {
+        const start = Math.min(alloc.outer, alloc.inner);
+        const end = Math.max(alloc.outer, alloc.inner);
+        const clampedStart = Math.max(minStart, Math.min(maxEnd, start));
+        const clampedEnd = Math.max(minStart, Math.min(maxEnd, end));
+        if (clampedEnd <= clampedStart) return null;
+        const widthPercent = ((clampedEnd - clampedStart) / totalSpan) * 100;
+        const startPercent = ((clampedStart - minStart) / totalSpan) * 100;
+        return {
+          id: alloc.id || idx,
+          startPercent,
+          widthPercent,
+          allocation: alloc,
+        };
+      })
+      .filter(Boolean);
+  };
+  const formatTimelineValue = (value) => (Number.isFinite(value) ? value : "—");
   const reelSpanSummaries = knownReels.map((serial) => {
     const spans = reelSpanMap[serial] || [];
     if (spans.length === 0) return { serial, hasSpan: false };
@@ -697,6 +760,10 @@ export default function ProductCard({
                           <div className="space-y-2">
                             {knownReels.map((serial) => {
                               const spans = reelSpanMap[serial] || [];
+                              const timeline = buildReelTimeline(spans);
+                              const allocationSegments = timeline
+                                ? buildAllocationSegments(serial, timeline.minStart, timeline.maxEnd)
+                                : [];
                               return (
                                 <div
                                   key={serial}
@@ -751,9 +818,63 @@ export default function ProductCard({
                                         );
                                       })}
                                   </div>
+                                  <div className="col-span-full mt-1">
+                                    {timeline ? (
+                                      <div className="space-y-1 text-[11px] text-slate-500">
+                                        <div className="relative h-2.5 rounded-full bg-slate-100 overflow-hidden shadow-inner">
+                                          {timeline.segments.map((segment, idx) => (
+                                            <span
+                                              key={`span-${serial}-${segment.id ?? idx}`}
+                                              className="absolute inset-y-0 rounded-full bg-slate-800/90 transition-all"
+                                              style={{
+                                                left: `${segment.startPercent}%`,
+                                                width: `${Math.min(Math.max(segment.widthPercent, 0), 100)}%`,
+                                              }}
+                                              title={`${segment.label}`}
+                                            />
+                                          ))}
+                                          {allocationSegments.map((segment) => (
+                                            <span
+                                              key={`alloc-${serial}-${segment.id}`}
+                                              className={`absolute inset-y-0 rounded-full opacity-90 ${getAllocationSegmentClass(
+                                                segment.allocation,
+                                              )} z-10`}
+                                              style={{
+                                                left: `${segment.startPercent}%`,
+                                                width: `${Math.min(Math.max(segment.widthPercent, 0), 100)}%`,
+                                              }}
+                                              title={`${segment.allocation.allocationId || "Allocation"} ${segment.allocation.allocationCategory || ""}`.trim()}
+                                            />
+                                          ))}
+                                        </div>
+                                        <div className="flex justify-between text-[10px] text-slate-400 uppercase tracking-wide">
+                                          <span>from {formatTimelineValue(timeline.minStart)}</span>
+                                          <span>to {formatTimelineValue(timeline.maxEnd)}</span>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <div className="text-[11px] text-slate-400">
+                                        Timeline: no spans recorded yet.
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
                               );
                             })}
+                            <div className="mt-1 flex flex-wrap gap-3 text-[10px] text-slate-500">
+                              <span className="flex items-center gap-1">
+                                <span className="h-2 w-2 rounded-full bg-sky-500/90 border border-sky-400/80" />
+                                Allocated
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <span className="h-2 w-2 rounded-full bg-amber-400/90 border border-amber-300/80" />
+                                Pending
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <span className="h-2 w-2 rounded-full bg-slate-400/90 border border-slate-300/80" />
+                                Returned
+                              </span>
+                            </div>
                           </div>
                         </div>
                       )}
