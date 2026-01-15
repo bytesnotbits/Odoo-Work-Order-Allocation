@@ -1097,11 +1097,21 @@ export default function ProductCard({
                           )}
                       </div>
                       {a.type === "reel" && (
-                      <div className="flex flex-wrap gap-2 mt-2 text-[11px]">
-                        <span className={`${chipBase} ${chipColor}`}>
-                          Reel Number: <b>{a.reelSerial || "—"}</b>
-                        </span>
-                      </div>
+                        <>
+                          <div className="flex flex-wrap gap-2 mt-2 text-[11px]">
+                            <span className={`${chipBase} ${chipColor}`}>
+                              Reel Number: <b>{a.reelSerial || "—"}</b>
+                            </span>
+                          </div>
+                          <div className="flex flex-wrap gap-2 mt-2 text-[11px]">
+                            <span className={`${chipBase} ${chipColor}`}>
+                              Inner Seq: <b>{formatTimelineValue(a.inner)}</b>
+                            </span>
+                            <span className={`${chipBase} ${chipColor}`}>
+                              Outer Seq: <b>{formatTimelineValue(a.outer)}</b>
+                            </span>
+                          </div>
+                        </>
                       )}
                       <div className="flex flex-wrap gap-2 mt-2 text-[11px]">
                         <span className={`${chipBase} ${chipColor}`}>
