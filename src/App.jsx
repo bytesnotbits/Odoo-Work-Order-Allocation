@@ -613,14 +613,41 @@ export default function App() {
     userDisplayName,
   ]);
 
-  const handleHistoryEntryPurge = (entryId) => {
-    if (!entryId) return;
-    const currentlyDisplayedWO = activeWO;
-    removeHistoryEntry(entryId);
-    if (entryId === currentlyDisplayedWO) {
-      setSelectedWO("");
-      setAllowImplicitSelection(false);
-    }
+  const clearWorkOrderUserData = useCallback(
+    (woId) => {
+      if (!woId) return;
+      const prefix = `${woId}|`;
+      setAllocState((prev) => {
+        const keys = Object.keys(prev).filter((key) => key.startsWith(prefix));
+        if (keys.length === 0) return prev;
+        const next = { ...prev };
+        keys.forEach((key) => delete next[key]);
+        return next;
+      });
+      setMiscEntries((prev) => {
+        if (!prev[woId]) return prev;
+        const { [woId]: _, ...rest } = prev;
+        return rest;
+      });
+      setWorkOrderNotes((prev) => {
+        if (!prev[woId]) return prev;
+        const { [woId]: _, ...rest } = prev;
+        return rest;
+      });
+    },
+    [setAllocState, setMiscEntries, setWorkOrderNotes],
+  );
+
+  const handleHistoryEntryStartOver = (entry) => {
+    if (!entry?.id) return;
+    clearWorkOrderUserData(entry.id);
+    setSelectedWO(entry.id);
+    setAllowImplicitSelection(true);
+    logAuditEvent(
+      entry.id,
+      "Reset work order",
+      "Cleared user-added allocations, notes, and misc entries",
+    );
   };
 
   const formatTimestamp = (value) => {
@@ -645,7 +672,7 @@ export default function App() {
 
   const snapshotSourceLabel = localSnapshot?.source === "indexedDB" ? "IndexedDB" : "browser storage";
   
-  const HistoryEntryCard = ({ entry, highlight = false, onPurge }) => {
+  const HistoryEntryCard = ({ entry, highlight = false, onStartOver }) => {
     const statusDefinition = WORK_ORDER_HISTORY_STATUSES.find(
       (statusOption) => statusOption.value === entry.status,
     );
@@ -697,10 +724,10 @@ export default function App() {
           </button>
           <button
             type="button"
-            onClick={() => onPurge?.(entry.id)}
+            onClick={() => onStartOver?.(entry)}
             className="rounded-2xl border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-rose-600 hover:border-rose-300"
           >
-            Purge
+            Start over
           </button>
         </div>
       </div>
@@ -963,7 +990,7 @@ export default function App() {
               {featuredHistoryEntry ? (
                 <>
                   <div className="text-xs text-slate-500">Currently open work order</div>
-                  <HistoryEntryCard entry={featuredHistoryEntry} highlight onPurge={handleHistoryEntryPurge} />
+                  <HistoryEntryCard entry={featuredHistoryEntry} highlight onStartOver={handleHistoryEntryStartOver} />
                 </>
               ) : (
                 <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-xs text-slate-500">
