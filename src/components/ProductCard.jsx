@@ -38,7 +38,7 @@ export default function ProductCard({
     sepcat: "SEPCAT",
   };
   const copyChipClasses = [
-    "inline-flex items-center gap-2 px-3 py-1 rounded-full border text-[11px] font-semibold transition",
+    "inline-flex items-center gap-2 px-3 py-1 rounded-full border text-[11px] font-semibold transition group relative overflow-visible",
     "border-slate-200 bg-white text-slate-900",
     "hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500",
     "cursor-pointer select-none",
@@ -111,9 +111,37 @@ export default function ProductCard({
   const [spanEndInput, setSpanEndInput] = useState("");
   const [selectedSpanId, setSelectedSpanId] = useState("");
   const [selectedAllocation, setSelectedAllocation] = useState(null);
+  const [selectedPendingCardId, setSelectedPendingCardId] = useState(null);
   const [coeLocInput, setCoeLocInput] = useState("");
   const [rackBayInput, setRackBayInput] = useState("");
   const [sepcatInput, setSepcatInput] = useState(SEPCAT_OPTIONS[0]);
+  const [highlightedFields, setHighlightedFields] = useState({});
+  const highlightTimeoutsRef = useRef({});
+  useEffect(() => () => {
+    Object.values(highlightTimeoutsRef.current).forEach(clearTimeout);
+  }, []);
+  const triggerFieldHighlight = (fieldKey) => {
+    if (!fieldKey) return;
+    setHighlightedFields((prev) => ({ ...prev, [fieldKey]: true }));
+    if (highlightTimeoutsRef.current[fieldKey]) {
+      clearTimeout(highlightTimeoutsRef.current[fieldKey]);
+    }
+    highlightTimeoutsRef.current[fieldKey] = setTimeout(() => {
+      setHighlightedFields((prev) => {
+        if (!prev[fieldKey]) return prev;
+        const next = { ...prev };
+        delete next[fieldKey];
+        return next;
+      });
+      delete highlightTimeoutsRef.current[fieldKey];
+    }, 2000);
+  };
+  const updateFieldWithHighlight = (setter, fieldKey, value) => {
+    setter(value);
+    triggerFieldHighlight(fieldKey);
+  };
+  const fieldHighlightClasses = (fieldKey) =>
+    highlightedFields[fieldKey] ? "highlighted-field" : "";
 
   if (!base) return null;
 
@@ -502,40 +530,53 @@ export default function ProductCard({
 
   const defaultCategory = ALLOCATION_OPTIONS[0] || "";
   const handleSelectAllocation = (alloc) => {
+    setSelectedPendingCardId(null);
     setSelectedAllocation(alloc);
-    setAllocId(alloc.allocationId || "");
+    const rawAssetMeta = (extra.assets && extra.assets[alloc.id]) || {};
+    const allocMeta = typeof rawAssetMeta === "object"
+      ? rawAssetMeta
+      : { assetId: rawAssetMeta ?? "", coeLoc: "", rackBay: "", sepcat: "" };
+    updateFieldWithHighlight(setAllocId, "allocation-notes", alloc.allocationId || "");
     if (alloc.allocationCategoryIsCustom) {
-      setAllocCategory("__custom__");
-      setAllocCategoryCustom(alloc.allocationCategory || "");
+      updateFieldWithHighlight(setAllocCategory, "allocation-category", "__custom__");
+      updateFieldWithHighlight(setAllocCategoryCustom, "custom-category", alloc.allocationCategory || "");
     } else {
-      setAllocCategory(alloc.allocationCategory || defaultCategory);
+      updateFieldWithHighlight(setAllocCategory, "allocation-category", alloc.allocationCategory || defaultCategory);
       setAllocCategoryCustom("");
+      triggerFieldHighlight("custom-category");
     }
-    setReelSerial(alloc.reelSerial || "");
+    updateFieldWithHighlight(setReelSerial, "optional-reel-serial", alloc.reelSerial || "");
     if (alloc.type === "reel") {
-      setOuter(formatSpanInput(alloc.outer));
-      setInner(formatSpanInput(alloc.inner));
-      setAllocQty("");
+      updateFieldWithHighlight(setOuter, "optional-reel-serial", formatSpanInput(alloc.outer));
+      updateFieldWithHighlight(setInner, "optional-reel-serial", formatSpanInput(alloc.inner));
+      updateFieldWithHighlight(setAllocQty, "allocation-qty", "");
     } else {
-      setAllocQty(alloc.qty != null ? String(alloc.qty) : "");
-      setOuter("");
-      setInner("");
+      updateFieldWithHighlight(setAllocQty, "allocation-qty", alloc.qty != null ? String(alloc.qty) : "");
+      updateFieldWithHighlight(setOuter, "optional-reel-serial", "");
+      updateFieldWithHighlight(setInner, "optional-reel-serial", "");
     }
+    updateFieldWithHighlight(setCoeLocInput, "engineering-coe-loc", allocMeta.coeLoc || "");
+    updateFieldWithHighlight(setRackBayInput, "engineering-rack-bay", allocMeta.rackBay || "");
+    updateFieldWithHighlight(setSepcatInput, "engineering-sepcat", allocMeta.sepcat || SEPCAT_OPTIONS[0]);
   };
 
-  const primeSyntheticPendingForm = (qty) => {
+  const primeSyntheticPendingForm = (qty, pendingCardId = null) => {
     setSelectedAllocation(null);
-    setAllocId("");
-    setAllocQty(qty != null ? String(qty) : "");
+    setSelectedPendingCardId(pendingCardId);
+    updateFieldWithHighlight(setAllocId, "allocation-notes", "");
+    updateFieldWithHighlight(setAllocQty, "allocation-qty", qty != null ? String(qty) : "");
     const pendingCategoryAvailable = allocationOptionsForProduct.includes(DEFAULT_PENDING_CATEGORY);
     const pendingFormCategory = pendingCategoryAvailable
       ? DEFAULT_PENDING_CATEGORY
       : allocationOptionsForProduct[0] || DEFAULT_PENDING_CATEGORY;
-    setAllocCategory(pendingFormCategory);
-    setAllocCategoryCustom("");
-    setReelSerial("");
-    setOuter("");
-    setInner("");
+    updateFieldWithHighlight(setAllocCategory, "allocation-category", pendingFormCategory);
+    updateFieldWithHighlight(setAllocCategoryCustom, "custom-category", "");
+    updateFieldWithHighlight(setReelSerial, "optional-reel-serial", "");
+    updateFieldWithHighlight(setOuter, "optional-reel-serial", "");
+    updateFieldWithHighlight(setInner, "optional-reel-serial", "");
+    updateFieldWithHighlight(setCoeLocInput, "engineering-coe-loc", "");
+    updateFieldWithHighlight(setRackBayInput, "engineering-rack-bay", "");
+    updateFieldWithHighlight(setSepcatInput, "engineering-sepcat", SEPCAT_OPTIONS[0]);
   };
 
   const hasUnresolvedQuantities = remaining > 0 || pendingReturnSum > 0;
@@ -671,7 +712,7 @@ export default function ProductCard({
                   <label className="block text-xs font-medium text-slate-500 uppercase tracking-wide">COE LOC</label>
                   <input
                     name={buildInputName("engineering-coe-loc")}
-                    className="w-full border rounded-xl p-2"
+                    className={`w-full border rounded-xl p-2 transition-colors ${fieldHighlightClasses("engineering-coe-loc")}`}
                     placeholder="COE LOC"
                     value={coeLocInput}
                     onChange={(e) => setCoeLocInput(e.target.value)}
@@ -681,7 +722,7 @@ export default function ProductCard({
                   <label className="block text-xs font-medium text-slate-500 uppercase tracking-wide">Rack/Bay</label>
                   <input
                     name={buildInputName("engineering-rack-bay")}
-                    className="w-full border rounded-xl p-2"
+                    className={`w-full border rounded-xl p-2 transition-colors ${fieldHighlightClasses("engineering-rack-bay")}`}
                     placeholder="RACK/BAY"
                     value={rackBayInput}
                     onChange={(e) => setRackBayInput(e.target.value)}
@@ -693,7 +734,7 @@ export default function ProductCard({
                   </label>
                   <select
                     id={sepcatFieldId}
-                    className="w-full border rounded-xl p-2"
+                    className={`w-full border rounded-xl p-2 transition-colors ${fieldHighlightClasses("engineering-sepcat")}`}
                     value={sepcatInput}
                     onChange={(e) => setSepcatInput(e.target.value)}
                   >
@@ -715,14 +756,14 @@ export default function ProductCard({
                   type="number"
                   min={0}
                   step={1}
-                  className="w-full border rounded-xl p-2"
+                  className={`w-full border rounded-xl p-2 transition-colors ${fieldHighlightClasses("allocation-qty")}`}
                   value={allocQty}
                   onChange={(e) => setAllocQty(e.target.value)}
                 />
                 <label className="block text-sm">Allocation notes (optional)</label>
                 <input
                   name={buildInputName("allocation-notes")}
-                  className="w-full border rounded-xl p-2"
+                  className={`w-full border rounded-xl p-2 transition-colors ${fieldHighlightClasses("allocation-notes")}`}
                   value={allocId}
                   onChange={(e) => setAllocId(e.target.value)}
                   placeholder="e.g., AERIAL-FIBER-01"
@@ -732,7 +773,7 @@ export default function ProductCard({
                   <select
                     id={allocationCategoryFieldId}
                     name={buildInputName("allocation-category")}
-                    className="border rounded-xl p-2"
+                    className={`border rounded-xl p-2 transition-colors ${fieldHighlightClasses("allocation-category")}`}
                     value={allocCategory}
                     onChange={(e) => setAllocCategory(e.target.value)}
                   >
@@ -742,7 +783,7 @@ export default function ProductCard({
                   {allocCategory === "__custom__" && (
                     <input
                       name={buildInputName("custom-category")}
-                      className="flex-1 border rounded-xl p-2"
+                      className={`flex-1 border rounded-xl p-2 transition-colors ${fieldHighlightClasses("custom-category")}`}
                       placeholder="Enter custom category"
                       value={allocCategoryCustom}
                       onChange={(e) => setAllocCategoryCustom(e.target.value)}
@@ -752,7 +793,7 @@ export default function ProductCard({
                 <label className="block text-sm mt-2">Reel/Serial Number (optional)</label>
                 <input
                   name={buildInputName("optional-reel-serial")}
-                  className="w-full border rounded-xl p-2"
+                  className={`w-full border rounded-xl p-2 transition-colors ${fieldHighlightClasses("optional-reel-serial")}`}
                   value={reelSerial}
                   onChange={(e) => setReelSerial(e.target.value)}
                   placeholder="e.g., REEL-12345 or SN-0001"
@@ -1149,27 +1190,32 @@ export default function ProductCard({
                       ? "border-slate-200 bg-slate-100 text-slate-500"
                       : "border-slate-200 bg-white text-slate-900";
                 const isSelectedAllocation = !isSyntheticPendingCard && selectedAllocation?.id === a.id;
-                const selectionClasses = isSelectedAllocation
+                const isSelectedPendingCard = isSyntheticPendingCard && selectedPendingCardId === a.id;
+                const selectionClasses = isSelectedAllocation || isSelectedPendingCard
                   ? "ring-2 ring-blue-500/50 shadow-lg"
-                  : (isSyntheticPendingCard ? "" : "hover:shadow-md");
-                const interactive = !isSyntheticPendingCard;
-                const eventProps = interactive
-                  ? {
-                      role: "button",
-                      tabIndex: 0,
-                      onClick: () => handleSelectAllocation(a),
-                      onKeyDown: (event) => {
-                        if (event.key === "Enter" || event.key === " ") {
-                          event.preventDefault();
-                          handleSelectAllocation(a);
-                        }
-                      },
+                  : "hover:shadow-md";
+                const handleCardActivation = () => {
+                  if (isSyntheticPendingCard) {
+                    primeSyntheticPendingForm(a.qty, a.id);
+                    return;
+                  }
+                  handleSelectAllocation(a);
+                };
+                const eventProps = {
+                  role: "button",
+                  tabIndex: 0,
+                  onClick: handleCardActivation,
+                  onKeyDown: (event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      handleCardActivation();
                     }
-                  : {};
+                  },
+                };
                 return (
                     <div
                       key={a.id}
-                      className={`rounded-2xl border p-3 shadow-sm ${cardColor} ${selectionClasses} ${interactive ? "cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500" : ""}`}
+                      className={`rounded-2xl border p-3 shadow-sm ${cardColor} ${selectionClasses} cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500`}
                       {...eventProps}
                     >
                       <div className="flex items-center justify-between flex-wrap gap-2">
@@ -1203,22 +1249,6 @@ export default function ProductCard({
                             </button>
                           </div>
                         )}
-                          {isSyntheticPendingCard && (
-                            <div className="flex flex-wrap items-center gap-2 text-[11px] text-amber-700 mt-1">
-                              <span>Auto-generated pending balance</span>
-                              <button
-                                type="button"
-                                className="text-[11px] font-semibold underline decoration-amber-400 underline-offset-2 hover:text-amber-900"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  primeSyntheticPendingForm(a.qty);
-                                }}
-                                aria-label="Open pending for edit"
-                              >
-                                Edit
-                              </button>
-                            </div>
-                          )}
                       </div>
                       {a.type === "reel" && (
                         <>
@@ -1254,21 +1284,35 @@ export default function ProductCard({
                       )}
                       {showAssetMetaSection && (
                         <div className="mt-3 flex flex-wrap gap-2">
-                          {assetMetaFields.map(({ key, label, value, field }) => (
-                            <button
-                              key={key}
-                              type="button"
-                              className={`${copyChipClasses} ${copyChipTruncate} flex flex-col items-start gap-1`}
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                copyAssetField(field, value, key);
-                              }}
-                              aria-label={`Copy ${label}`}
-                            >
-                              <span className="text-[10px] uppercase tracking-wide text-slate-500">{label}</span>
-                              <span className="text-sm font-semibold">{value}</span>
-                            </button>
-                          ))}
+                          {assetMetaFields.map(({ key, label, value, field }) => {
+                            const isCopied = copiedMetaKey === key;
+                            const tooltipText = isCopied ? "Copied!" : "Click to copy value";
+                            const tooltipToneClasses = isCopied
+                              ? "bg-emerald-600 text-white"
+                              : "bg-slate-900 text-white";
+                            return (
+                              <button
+                                key={key}
+                                type="button"
+                                className={`${copyChipClasses} ${copyChipTruncate} flex flex-col items-start gap-1`}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  copyAssetField(field, value, key);
+                                }}
+                                aria-label={`Copy ${label}`}
+                                title={tooltipText}
+                              >
+                                <span className="text-[10px] uppercase tracking-wide text-slate-500">{label}</span>
+                                <span className="text-sm font-semibold">{value}</span>
+                                <span
+                                  className={`pointer-events-none absolute left-1/2 -top-8 -translate-x-1/2 rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-wide transition-opacity duration-150 shadow-lg ${tooltipToneClasses} ${isCopied ? "opacity-100" : "opacity-0 group-hover:opacity-100"} z-10`}
+                                  aria-live={isCopied ? "polite" : undefined}
+                                >
+                                  {tooltipText}
+                                </span>
+                             </button>
+                            );
+                          })}
                         </div>
                       )}
                       {isSyntheticPendingCard && (

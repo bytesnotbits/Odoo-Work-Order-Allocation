@@ -18,6 +18,7 @@ import { useWorkOrderHistory } from "./hooks/useWorkOrderHistory";
 import { useAuditTrail } from "./hooks/useAuditTrail";
 import { naturalCompare } from "./lib/natural";
 import { loadUserIdentity, persistUserIdentity } from "./utils/identityStorage";
+import "./App.css";
 
 const HISTORY_STATUS_FILTERS = [
   { value: "all", label: "All" },
