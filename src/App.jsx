@@ -277,9 +277,9 @@ export default function App() {
   } = useAllocations(groupedWithMisc);
 
   const handleUpsertAllocation = useCallback(
-    (wo, code, payload) => {
+    (wo, code, payload, assetMeta) => {
       if (!wo || !payload) return undefined;
-      const allocId = upsertAllocation(wo, code, payload);
+      const allocId = upsertAllocation(wo, code, payload, assetMeta);
       const detail = describeAllocationPayload(wo, code, payload);
       logAuditEvent(wo, "Recorded allocation", detail);
       return allocId;
