@@ -21,3 +21,7 @@
 ### Summary & Next Steps
 1. Build an unlock path tied to history status transitions so accountants can “return” WOs cleanly.
 2. Integrate Azure AD authentication for user context and use the same identity to drive MS Teams notifications when statuses change.
+
+### Comprehensive AI-Consumable User Manual
+- Capture every workflow step, UI affordance, and decision path inside a structured “user manual” that an AI chatbot can ingest (think JSON, markdown, or another consistent schema). The manual should describe: how to load work orders, interpret each dashboard panel, add/remove allocations (including synthetic placeholders), work with reels/spans, manage misc assets, and handle edge cases noted in the app today.
+- The chatbot would then be able to answer user questions or walk them through specific tasks (“How do I convert a pending allocation to a reel?”) by referencing the manual, ensuring consistent, step-by-step guidance without requiring an engineer to study a manual in order to utilize the app.

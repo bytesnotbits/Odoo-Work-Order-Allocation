@@ -698,12 +698,15 @@ export default function ProductCard({
                             {knownReels.map((serial) => {
                               const spans = reelSpanMap[serial] || [];
                               return (
-                                <div key={serial} className="space-y-1">
-                                  <div className="flex flex-wrap items-center gap-2">
+                                <div
+                                  key={serial}
+                                  className="grid w-full items-center gap-2 sm:grid-cols-[auto,1fr]"
+                                >
+                                  <div className="flex items-center gap-2 whitespace-nowrap">
                                     <button
                                       type="button"
                                       className={[
-                                        "px-2 py-1 rounded-full border text-[11px] transition",
+                                        "px-2 py-1 rounded-full border text-[11px] transition whitespace-nowrap",
                                         serial === reelSerial
                                           ? "bg-slate-900 text-white border-slate-900"
                                           : "bg-white text-slate-900 border-slate-200 hover:bg-slate-50"
@@ -724,28 +727,30 @@ export default function ProductCard({
                                       ×
                                     </button>
                                   </div>
-                                  {spans.length > 0 && (
-                                    <div className="flex flex-wrap gap-2">
-                                      {spans.map((span) => {
-                                        const isActiveSpan = span.id === selectedSpanId;
+                                  <div className="flex flex-wrap gap-2 sm:flex-nowrap min-w-0">
+                                    {spans.length > 0 &&
+                                      spans.map((span) => {
+                                        const isActiveSpan =
+                                          span.id === selectedSpanId;
                                         return (
                                           <button
                                             type="button"
                                             key={span.id}
                                             className={[
-                                              "px-2 py-1 rounded-full border text-[11px] transition",
+                                              "px-2 py-1 rounded-full border text-[11px] transition whitespace-nowrap text-center min-w-[84px]",
                                               isActiveSpan
                                                 ? "bg-slate-900 text-white border-slate-900"
                                                 : "bg-white text-slate-900 border-slate-200 hover:bg-slate-50"
                                             ].join(" ")}
-                                            onClick={() => handleSelectSpan(serial, span)}
+                                            onClick={() =>
+                                              handleSelectSpan(serial, span)
+                                            }
                                           >
                                             [{span.start}–{span.end}]
                                           </button>
                                         );
                                       })}
-                                    </div>
-                                  )}
+                                  </div>
                                 </div>
                               );
                             })}
