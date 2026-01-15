@@ -37,8 +37,9 @@
 
 ### Connect to NISC via API so that the work order data is automatically populated in real-time and does not require the user to upload CSVs manually.
 
-### Create a centralized database that becomes one source of truth.
+### Create a centralized SQL database that becomes one source of truth.
+### Have this DB hosted by HCTC behind MS Azure authentication
 
-### Setup MS Teams messaging and MS Azure authentication
+### Setup MS Teams messaging
 
 ### Implement the ability for the app to recognize work order revisions

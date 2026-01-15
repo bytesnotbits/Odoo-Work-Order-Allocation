@@ -1230,6 +1230,7 @@ export default function ProductCard({
                       handleCardActivation();
                     }
                   },
+                  ...(isSyntheticPendingCard ? { "aria-label": `Open pending for edit – ${a.qty ?? 0} units pending` } : {}),
                 };
                 return (
                     <div
@@ -1335,8 +1336,13 @@ export default function ProductCard({
                         </div>
                       )}
                       {isSyntheticPendingCard && (
-                        <div className="text-xs text-amber-700 mt-2">
-                          This entry represents {a.qty ?? 0} units still awaiting allocation.
+                        <div className="space-y-1">
+                          <div className="text-[11px] font-semibold uppercase tracking-wide text-amber-600">
+                            Auto-generated pending balance
+                          </div>
+                          <div className="text-xs text-amber-700">
+                            This entry represents {a.qty ?? 0} units still awaiting allocation.
+                          </div>
                         </div>
                       )}
                     </div>

@@ -18,7 +18,10 @@ import { useWorkOrderHistory } from "./hooks/useWorkOrderHistory";
 import { useAuditTrail } from "./hooks/useAuditTrail";
 import { naturalCompare } from "./lib/natural";
 import { loadUserIdentity, persistUserIdentity } from "./utils/identityStorage";
+import packageJson from "../package.json";
 import "./App.css";
+
+const APP_VERSION = packageJson.version;
 
 const HISTORY_STATUS_FILTERS = [
   { value: "all", label: "All" },
@@ -840,30 +843,33 @@ export default function App() {
           )}
           <div className={lockedContentClassName}>
             <div className="mb-6 flex flex-wrap items-center gap-3 text-xs">
-          <div
-            className={`px-2 py-1 rounded-full border ${
-              hasUnsavedChanges
-                ? "border-amber-200 bg-amber-50 text-amber-700"
-                : "border-emerald-200 bg-emerald-50 text-emerald-700"
-            }`}
-          >
-            {hasUnsavedChanges ? "Unsaved changes" : "All changes backed up"}
+              <div
+                className={`px-2 py-1 rounded-full border ${
+                  hasUnsavedChanges
+                    ? "border-amber-200 bg-amber-50 text-amber-700"
+                    : "border-emerald-200 bg-emerald-50 text-emerald-700"
+                }`}
+              >
+                {hasUnsavedChanges ? "Unsaved changes" : "All changes backed up"}
+              </div>
+              <div className="text-slate-600 whitespace-nowrap">
+                {localSnapshot
+                  ? `Local snapshot (${snapshotSourceLabel}) saved ${formatTimestamp(localSnapshot.savedAt)}`
+                  : "Waiting for local snapshot..."}
+              </div>
+              {lastBackup && (
+                <div className="text-slate-600 whitespace-nowrap">
+                  Last export: {lastBackup.filename} @ {formatTimestamp(lastBackup.timestamp)}
+                </div>
+              )}
+            {persistError && (
+              <div className="px-2 py-1 rounded-full border border-red-100 bg-red-50 text-red-600">
+                {persistError}
+              </div>
+            )}
           </div>
-          <div className="text-slate-600 whitespace-nowrap">
-            {localSnapshot
-              ? `Local snapshot (${snapshotSourceLabel}) saved ${formatTimestamp(localSnapshot.savedAt)}`
-              : "Waiting for local snapshot..."}
+
           </div>
-          {lastBackup && (
-            <div className="text-slate-600 whitespace-nowrap">
-              Last export: {lastBackup.filename} @ {formatTimestamp(lastBackup.timestamp)}
-            </div>
-          )}
-          {persistError && (
-            <div className="px-2 py-1 rounded-full border border-red-100 bg-red-50 text-red-600">
-              {persistError}
-            </div>
-          )}
         </div>
 
         <div className="grid gap-4 mb-6 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] md:grid-rows-[auto_auto]">
@@ -1130,58 +1136,58 @@ export default function App() {
         ) : (
           <div className="text-gray-600">No work orders found in the file.</div>
         )}
-      </div>
-      {showAuditPanel && (
-        <div className="fixed inset-0 z-40 flex items-center justify-end">
-          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setShowAuditPanel(false)} />
-          <div className="relative z-10 h-full max-w-md border-l border-slate-200 bg-white shadow-xl">
-            <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
-              <div>
-                <div className="text-sm font-semibold text-slate-900">Audit trail</div>
-                <p className="text-xs text-slate-500">
-                  Read-only log for {activeWO || "no work order selected"}.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowAuditPanel(false)}
-                className="text-xs font-semibold text-slate-500 hover:text-slate-900"
-              >
-                Close
-              </button>
-            </div>
-            <div className="flex h-full flex-col space-y-3 overflow-auto p-4">
-              {activeWO ? (
-                auditEntriesForActive.length === 0 ? (
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-500">
-                    No audit records yet. Actions like allocations or status changes will appear here.
-                  </div>
-                ) : (
-                  auditEntriesForActive.map((event) => (
-                    <div key={event.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700">
-                      <div className="flex items-center justify-between">
-                        <span className="font-semibold text-slate-900">{event.action}</span>
-                        <span className="text-slate-500">{formatTimestamp(event.modifiedAt)}</span>
-                      </div>
-                      <div className="text-xs text-slate-500">
-                        {event.details || "No additional context"}
-                      </div>
-                      <div className="text-xs text-slate-500">By {event.modifiedBy || "Unknown user"}</div>
-                    </div>
-                  ))
-                )
-              ) : (
-                <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-xs text-slate-500">
-                  Load a work order to view its audit trail.
+        {showAuditPanel && (
+          <div className="fixed inset-0 z-40 flex items-center justify-end">
+            <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setShowAuditPanel(false)} />
+            <div className="relative z-10 h-full max-w-md border-l border-slate-200 bg-white shadow-xl">
+              <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+                <div>
+                  <div className="text-sm font-semibold text-slate-900">Audit trail</div>
+                  <p className="text-xs text-slate-500">
+                    Read-only log for {activeWO || "no work order selected"}.
+                  </p>
                 </div>
-              )}
+                <button
+                  type="button"
+                  onClick={() => setShowAuditPanel(false)}
+                  className="text-xs font-semibold text-slate-500 hover:text-slate-900"
+                >
+                  Close
+                </button>
+              </div>
+              <div className="flex h-full flex-col space-y-3 overflow-auto p-4">
+                {activeWO ? (
+                  auditEntriesForActive.length === 0 ? (
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-500">
+                      No audit records yet. Actions like allocations or status changes will appear here.
+                    </div>
+                  ) : (
+                    auditEntriesForActive.map((event) => (
+                      <div key={event.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700">
+                        <div className="flex items-center justify-between">
+                          <span className="font-semibold text-slate-900">{event.action}</span>
+                          <span className="text-slate-500">{formatTimestamp(event.modifiedAt)}</span>
+                        </div>
+                        <div className="text-xs text-slate-500">
+                          {event.details || "No additional context"}
+                        </div>
+                        <div className="text-xs text-slate-500">By {event.modifiedBy || "Unknown user"}</div>
+                      </div>
+                    ))
+                  )
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-xs text-slate-500">
+                    Load a work order to view its audit trail.
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      )}
-        </div>
+        )}
+      </div>
+      <div className="fixed bottom-4 right-4 rounded-full border border-slate-200 bg-white/80 px-3 py-1 text-[11px] font-semibold text-slate-500 backdrop-blur-sm">
+        v{APP_VERSION}
       </div>
     </div>
-  </div>
   );
 }

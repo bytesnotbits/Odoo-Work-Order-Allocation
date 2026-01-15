@@ -9,3 +9,5 @@ to produce the production bundle in dist/.
 ## npm run deploy
 
 (it invokes gh-pages -d dist); this updates the gh-pages branch that serves the site.
+
+### Keep bumping APP_VERSION before future deployments so the badge and metadata stay in sync; consider wiring a release script or CI step to automate that if desired.
