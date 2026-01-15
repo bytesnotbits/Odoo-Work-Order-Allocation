@@ -63,12 +63,34 @@ export default function WOView({
   );
   const hasManyProducts = products.length > 5;
   const activeSearchTerm = hasManyProducts ? searchTerm.trim().toLowerCase() : "";
-  const matchesSearch = (product) => {
-    if (!activeSearchTerm) return true;
-    const searchTarget = `${product.code} ${product.desc || ""}`.toLowerCase();
+  const normalizeSearchValue = (value) => {
+    if (value === null || value === undefined) return "";
+    return String(value).trim();
+  };
+  const matchesSearch = ({ product, state }) => {
+    const extra = state?.extra || {};
+    const assetEntries = Object.values(extra.assets || {});
+    const assetIds = assetEntries
+      .map((asset) => (typeof asset === "string" ? asset : asset?.assetId))
+      .map(normalizeSearchValue)
+      .filter(Boolean);
+    const reelNumbers = (extra.allocations || [])
+      .map((alloc) => normalizeSearchValue(alloc.reelSerial))
+      .filter(Boolean);
+    const searchTarget = [
+      product.code,
+      product.desc,
+      ...assetIds,
+      ...reelNumbers,
+    ]
+      .map(normalizeSearchValue)
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
     return searchTarget.includes(activeSearchTerm);
   };
-  const visibleProducts = activeSearchTerm ? products.filter(matchesSearch) : products;
+  const visibleProductStates = activeSearchTerm ? productStates.filter(matchesSearch) : productStates;
+  const visibleProducts = visibleProductStates.map(({ product }) => product);
   const isSearchActive = Boolean(activeSearchTerm);
   return (
     <div className="space-y-6">
