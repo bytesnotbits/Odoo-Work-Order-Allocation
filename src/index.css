@@ -5,9 +5,9 @@
   line-height: 1.5;
   font-weight: 400;
 
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
+  color-scheme: light;
+  color: #1f2933;
+  background-color: #f8fbff;
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -29,19 +29,11 @@ body {
   /* allow the app to use full width; no global flex centering */
   min-width: 320px;
   min-height: 100vh;
+  color: inherit;
+  background-color: inherit;
 }
 
 h1 {
   font-size: 3.2em;
   line-height: 1.1;
-}
-
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
-  }
-  a:hover {
-    color: #747bff;
-  }
 }

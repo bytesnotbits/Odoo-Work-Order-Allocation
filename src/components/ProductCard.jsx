@@ -134,9 +134,17 @@ export default function ProductCard({
   };
   const triggerFieldHighlight = (fieldKey) => {
     if (!fieldKey) return;
-    setHighlightedFields((prev) => ({ ...prev, [fieldKey]: true }));
     if (highlightTimeoutsRef.current[fieldKey]) {
       clearTimeout(highlightTimeoutsRef.current[fieldKey]);
+    }
+    setHighlightedFields((prev) => ({ ...prev, [fieldKey]: false }));
+    const applyHighlight = () => {
+      setHighlightedFields((prev) => ({ ...prev, [fieldKey]: true }));
+    };
+    if (typeof window !== "undefined" && window.requestAnimationFrame) {
+      window.requestAnimationFrame(applyHighlight);
+    } else {
+      setTimeout(applyHighlight, 0);
     }
     highlightTimeoutsRef.current[fieldKey] = setTimeout(() => {
       setHighlightedFields((prev) => {

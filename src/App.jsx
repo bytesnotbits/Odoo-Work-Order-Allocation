@@ -6,7 +6,7 @@ import Section from "./components/Section";
 import Badge from "./components/Badge";
 import WOView from "./components/WOView";
 
-import { demoRows, MISC_PRODUCT_CODE, MISC_PRODUCT_DESC, MISC_PRODUCT_PREFIX } from "./lib/data";
+import { MISC_PRODUCT_CODE, MISC_PRODUCT_DESC, MISC_PRODUCT_PREFIX } from "./lib/data";
 import { normalizeRow, groupRows } from "./lib/rows";
 import { exportAllocationsToXLSX } from "./lib/xlsxExport";
 import { useAllocations } from "./hooks/useAllocations";
@@ -26,7 +26,7 @@ const HISTORY_STATUS_FILTERS = [
 ];
 const DROPDOWN_SUGGESTION_LIMIT = 6;
 export default function App() {
-  const [rawRows, setRawRows] = useState(demoRows);
+  const [rawRows, setRawRows] = useState([]);
   const [selectedWO, setSelectedWO] = useState("");
   const [tab, setTab] = useState("engineering"); // "engineering" | "accounting"
   const stateInputRef = useRef(null);
@@ -368,7 +368,7 @@ export default function App() {
         if (snapshot?.payload) {
           const normalizedRows = Array.isArray(snapshot.payload.rawRows)
             ? snapshot.payload.rawRows
-            : demoRows;
+            : [];
           const normalizedMisc = normalizeRecord(snapshot.payload.miscEntries);
           const normalizedNotes = normalizeRecord(snapshot.payload.workOrderNotes);
           const normalizedAlloc = normalizeRecord(snapshot.payload.allocState);
@@ -412,7 +412,7 @@ export default function App() {
 
   const applyPayload = (payload) => {
     if (!payload) return;
-    const normalizedRows = Array.isArray(payload.rawRows) ? payload.rawRows : demoRows;
+    const normalizedRows = Array.isArray(payload.rawRows) ? payload.rawRows : [];
     const normalizedMisc = normalizeRecord(payload.miscEntries);
     const normalizedNotes = normalizeRecord(payload.workOrderNotes);
     const normalizedAlloc = normalizeRecord(payload.allocState);
