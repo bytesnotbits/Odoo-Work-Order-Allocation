@@ -1,7 +1,7 @@
 Update Steps
 
 Make sure your working tree has the latest commits you want live (merge, test, etc.).
-# Run
+
 ## npm run build
 to produce the production bundle in dist/.
 

@@ -85,6 +85,10 @@ export default function ProductCard({
   const safeIdValue = (value) => String(value || "").replace(/[^a-zA-Z0-9-_:.]+/g, "-") || "field";
   const sepcatFieldId = `sepcat-${safeIdValue(wo)}-${safeIdValue(product.code)}`;
   const allocationCategoryFieldId = `allocation-category-${safeIdValue(wo)}-${safeIdValue(product.code)}`;
+  const productScope = `${safeIdValue(wo)}-${safeIdValue(product.code)}`;
+  const buildInputName = (suffix) => `${suffix}-${productScope}`;
+  const buildAssetMetaName = (field, allocationId) =>
+    `${field}-${safeIdValue(String(allocationId ?? "allocation"))}-${productScope}`;
   const isMiscProduct = isMiscProductCode(product.code);
   const productGroupLabel = String(product.group || "").trim().toUpperCase();
   const isScxrProduct = productGroupLabel.includes("SCXR");
@@ -517,7 +521,11 @@ export default function ProductCard({
     setSelectedAllocation(null);
     setAllocId("");
     setAllocQty(qty != null ? String(qty) : "");
-    setAllocCategory(DEFAULT_PENDING_CATEGORY);
+    const pendingCategoryAvailable = allocationOptionsForProduct.includes(DEFAULT_PENDING_CATEGORY);
+    const pendingFormCategory = pendingCategoryAvailable
+      ? DEFAULT_PENDING_CATEGORY
+      : allocationOptionsForProduct[0] || DEFAULT_PENDING_CATEGORY;
+    setAllocCategory(pendingFormCategory);
     setAllocCategoryCustom("");
     setReelSerial("");
     setOuter("");
@@ -656,6 +664,7 @@ export default function ProductCard({
                 <div>
                   <label className="block text-xs font-medium text-slate-500 uppercase tracking-wide">COE LOC</label>
                   <input
+                    name={buildInputName("engineering-coe-loc")}
                     className="w-full border rounded-xl p-2"
                     placeholder="COE LOC"
                     value={coeLocInput}
@@ -665,6 +674,7 @@ export default function ProductCard({
                 <div>
                   <label className="block text-xs font-medium text-slate-500 uppercase tracking-wide">Rack/Bay</label>
                   <input
+                    name={buildInputName("engineering-rack-bay")}
                     className="w-full border rounded-xl p-2"
                     placeholder="RACK/BAY"
                     value={rackBayInput}
@@ -694,13 +704,28 @@ export default function ProductCard({
             {!cableMode && (
               <div className="space-y-2">
                 <label className="block text-sm">Quantity</label>
-                <input type="number" min={0} step={1} className="w-full border rounded-xl p-2" value={allocQty} onChange={(e) => setAllocQty(e.target.value)} />
+                <input
+                  name={buildInputName("allocation-qty")}
+                  type="number"
+                  min={0}
+                  step={1}
+                  className="w-full border rounded-xl p-2"
+                  value={allocQty}
+                  onChange={(e) => setAllocQty(e.target.value)}
+                />
                 <label className="block text-sm">Allocation notes (optional)</label>
-                <input className="w-full border rounded-xl p-2" value={allocId} onChange={(e) => setAllocId(e.target.value)} placeholder="e.g., AERIAL-FIBER-01" />
+                <input
+                  name={buildInputName("allocation-notes")}
+                  className="w-full border rounded-xl p-2"
+                  value={allocId}
+                  onChange={(e) => setAllocId(e.target.value)}
+                  placeholder="e.g., AERIAL-FIBER-01"
+                />
                 <label htmlFor={allocationCategoryFieldId} className="block text-sm mt-2">Allocation Category</label>
                 <div className="flex gap-2">
                   <select
                     id={allocationCategoryFieldId}
+                    name={buildInputName("allocation-category")}
                     className="border rounded-xl p-2"
                     value={allocCategory}
                     onChange={(e) => setAllocCategory(e.target.value)}
@@ -709,11 +734,23 @@ export default function ProductCard({
                     <option value="__custom__">Custom…</option>
                   </select>
                   {allocCategory === "__custom__" && (
-                    <input className="flex-1 border rounded-xl p-2" placeholder="Enter custom category" value={allocCategoryCustom} onChange={(e) => setAllocCategoryCustom(e.target.value)} />
+                    <input
+                      name={buildInputName("custom-category")}
+                      className="flex-1 border rounded-xl p-2"
+                      placeholder="Enter custom category"
+                      value={allocCategoryCustom}
+                      onChange={(e) => setAllocCategoryCustom(e.target.value)}
+                    />
                   )}
                 </div>
                 <label className="block text-sm mt-2">Reel/Serial Number (optional)</label>
-                <input className="w-full border rounded-xl p-2" value={reelSerial} onChange={(e) => setReelSerial(e.target.value)} placeholder="e.g., REEL-12345 or SN-0001" />
+                <input
+                  name={buildInputName("optional-reel-serial")}
+                  className="w-full border rounded-xl p-2"
+                  value={reelSerial}
+                  onChange={(e) => setReelSerial(e.target.value)}
+                  placeholder="e.g., REEL-12345 or SN-0001"
+                />
                 <div className="flex gap-2">
                   <button
                     type="button"
@@ -920,6 +957,7 @@ export default function ProductCard({
                     <div>
                       <label className="block text-sm">Reel/Serial Number</label>
                       <input
+                        name={buildInputName("span-reel-serial")}
                         className="w-full border rounded-xl p-2"
                         value={reelSerial}
                         onChange={(e) => {
@@ -931,11 +969,23 @@ export default function ProductCard({
                     </div>
                     <div>
                       <label className="block text-sm">Inner Seq</label>
-                      <input type="number" className="w-full border rounded-xl p-2" value={spanStartInput} onChange={(e) => setSpanStartInput(e.target.value)} />
+                      <input
+                        name={buildInputName("span-inner")}
+                        type="number"
+                        className="w-full border rounded-xl p-2"
+                        value={spanStartInput}
+                        onChange={(e) => setSpanStartInput(e.target.value)}
+                      />
                     </div>
                     <div>
                       <label className="block text-sm">Outer Seq</label>
-                      <input type="number" className="w-full border rounded-xl p-2" value={spanEndInput} onChange={(e) => setSpanEndInput(e.target.value)} />
+                      <input
+                        name={buildInputName("span-outer")}
+                        type="number"
+                        className="w-full border rounded-xl p-2"
+                        value={spanEndInput}
+                        onChange={(e) => setSpanEndInput(e.target.value)}
+                      />
                     </div>
                   </div>
                   <div className="mt-2">
@@ -951,6 +1001,7 @@ export default function ProductCard({
                     <div>
                       <label className="block text-sm">Reel/Serial Number <span className="text-red-500">*</span></label>
                       <input
+                        name={buildInputName("piece-reel-serial")}
                         className="w-full border rounded-xl p-2"
                         value={reelSerial}
                         onChange={(e) => {
@@ -962,24 +1013,53 @@ export default function ProductCard({
                     </div>
                     <div>
                       <label className="block text-sm">Inner Seq</label>
-                      <input type="number" className="w-full border rounded-xl p-2" value={inner} onChange={(e) => setInner(e.target.value)} />
+                      <input
+                        name={buildInputName("piece-inner")}
+                        type="number"
+                        className="w-full border rounded-xl p-2"
+                        value={inner}
+                        onChange={(e) => setInner(e.target.value)}
+                      />
                     </div>
                     <div>
                       <label className="block text-sm">Outer Seq</label>
-                      <input type="number" className="w-full border rounded-xl p-2" value={outer} onChange={(e) => setOuter(e.target.value)} />
+                      <input
+                        name={buildInputName("piece-outer")}
+                        type="number"
+                        className="w-full border rounded-xl p-2"
+                        value={outer}
+                        onChange={(e) => setOuter(e.target.value)}
+                      />
                     </div>
                   </div>
                   <div className="text-sm text-gray-600">Footage = |Inner − Outer| → <b>{reelFootage}</b></div>
                   <label className="block text-sm mt-2">Allocation notes (optional)</label>
-                  <input className="w-full border rounded-xl p-2" value={allocId} onChange={(e) => setAllocId(e.target.value)} placeholder="e.g., AERIAL-SPAN-12" />
+                  <input
+                    name={buildInputName("piece-allocation-notes")}
+                    className="w-full border rounded-xl p-2"
+                    value={allocId}
+                    onChange={(e) => setAllocId(e.target.value)}
+                    placeholder="e.g., AERIAL-SPAN-12"
+                  />
                   <label className="block text-sm mt-2">Allocation Category</label>
                   <div className="flex gap-2">
-                    <select className="border rounded-xl p-2" value={allocCategory} onChange={(e) => setAllocCategory(e.target.value)}>
+                    <select
+                      name={buildInputName("piece-allocation-category")}
+                      className="border rounded-xl p-2"
+                      value={allocCategory}
+                      onChange={(e) => setAllocCategory(e.target.value)}
+                    >
                       {ALLOCATION_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
                       <option value="__custom__">Custom…</option>
                     </select>
                     {allocCategory === "__custom__" && (
-                      <input className="flex-1 border rounded-xl p-2" placeholder="Enter custom category" value={allocCategoryCustom} onChange={(e) => setAllocCategoryCustom(e.target.value)} />
+                      <input
+                        name={buildInputName("piece-custom-category")}
+                        className="flex-1 border rounded-xl p-2"
+                        placeholder="Enter custom category"
+                        value={allocCategoryCustom}
+                        onChange={(e) => setAllocCategoryCustom(e.target.value)}
+                      />
                     )}
                   </div>
                   <button disabled={locked} onClick={addReelPiece} className={primaryButton}><Plus className="w-4 h-4" /> Add piece</button>
@@ -1135,6 +1215,7 @@ export default function ProductCard({
                               <div className="text-xs font-medium text-slate-500 uppercase tracking-wide">Asset ID</div>
                               <div className="mt-1 flex items-center gap-2">
                                 <input
+                                  name={buildAssetMetaName("assetId", a.id)}
                                   className={`${inputBase} flex-1 min-w-0`}
                                   placeholder="Asset ID"
                                   value={meta.assetId || ""}
@@ -1163,6 +1244,7 @@ export default function ProductCard({
                                 <div className="text-xs font-medium text-slate-500 uppercase tracking-wide">COE LOC</div>
                                 <div className="mt-1 flex items-center gap-2">
                                   <input
+                                    name={buildAssetMetaName("coeLoc", a.id)}
                                     className={`${inputBase} flex-1 min-w-0`}
                                     placeholder="COE LOC"
                                     value={meta.coeLoc || ""}
@@ -1188,6 +1270,7 @@ export default function ProductCard({
                                 <div className="text-xs font-medium text-slate-500 uppercase tracking-wide">Rack/Bay</div>
                                 <div className="mt-1 flex items-center gap-2">
                                   <input
+                                    name={buildAssetMetaName("rackBay", a.id)}
                                     className={`${inputBase} flex-1 min-w-0`}
                                     placeholder="RACK/BAY"
                                     value={meta.rackBay || ""}
@@ -1213,6 +1296,7 @@ export default function ProductCard({
                                 <div className="text-xs font-medium text-slate-500 uppercase tracking-wide">SEPCAT</div>
                                 <div className="mt-1 flex items-center gap-2">
                                   <input
+                                    name={buildAssetMetaName("sepcat", a.id)}
                                     className={`${inputBase} flex-1 min-w-0`}
                                     placeholder="SEPCAT"
                                     value={meta.sepcat || ""}

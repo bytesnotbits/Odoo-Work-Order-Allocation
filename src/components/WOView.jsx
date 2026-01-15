@@ -101,6 +101,7 @@ export default function WOView({
           <div className="text-sm font-semibold text-slate-700">Search items</div>
           <div className="flex flex-col gap-2 sm:flex-row">
             <input
+              name="wo-search"
               type="search"
               placeholder="Search by item number or description"
               className="flex-1 border rounded-xl px-3 py-2"
@@ -125,21 +126,23 @@ export default function WOView({
           <div className={`font-medium ${isAccountingMode ? "text-rose-900" : "text-slate-900"}`}>Add miscellaneous material</div>
           <div className={miscNoteText}>Provisional only</div>
         </div>
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <input
-            type="text"
-            placeholder={nextMiscCode ? `${nextMiscCode}` : "Item number (e.g., MISC-1)"}
-            className="border rounded-xl px-3 py-2 w-full sm:w-48"
-            value={miscItemNumber}
-            onChange={(e) => setMiscItemNumber(e.target.value)}
-          />
-          <input
-            type="text"
-            placeholder="Description (optional)"
-            className="flex-1 border rounded-xl px-3 py-2"
-            value={miscDescription}
-            onChange={(e) => setMiscDescription(e.target.value)}
-          />
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <input
+              name="misc-item-number"
+              type="text"
+              placeholder={nextMiscCode ? `${nextMiscCode}` : "Item number (e.g., MISC-1)"}
+              className="border rounded-xl px-3 py-2 w-full sm:w-48"
+              value={miscItemNumber}
+              onChange={(e) => setMiscItemNumber(e.target.value)}
+            />
+            <input
+              name="misc-description"
+              type="text"
+              placeholder="Description (optional)"
+              className="flex-1 border rounded-xl px-3 py-2"
+              value={miscDescription}
+              onChange={(e) => setMiscDescription(e.target.value)}
+            />
           <button
             type="button"
             className="whitespace-nowrap rounded-xl border border-slate-200 bg-slate-900 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white shadow-sm transition hover:bg-slate-800"

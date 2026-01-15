@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import ProductCard from '../components/ProductCard.jsx';
 
 vi.mock('../lib/data', () => {
@@ -64,4 +64,37 @@ test('Non-SCXR allocations hide COE inputs in Accounting', () => {
   expect(screen.queryByPlaceholderText(/COE LOC/i)).not.toBeInTheDocument();
   expect(screen.queryByPlaceholderText(/RACK\/BAY/i)).not.toBeInTheDocument();
   expect(screen.queryByLabelText(/SEPCAT/i)).not.toBeInTheDocument();
+});
+
+const makeSyntheticState = () => ({
+  base: {},
+  extra: { allocations: [], assets: {} },
+  totalAvailable: 2,
+  allocatedSum: 0,
+  pendingReturnSum: 0,
+  returnedSum: 0,
+  netAllocated: 0,
+  remaining: 2,
+  overAllocated: false,
+  cableMode: false,
+  cableSuggested: false,
+  isMisc: false,
+});
+
+test('Editing synthetic pending keeps SCXR category', () => {
+  render(
+    <ProductCard
+      {...baseProps}
+      getItemState={() => makeSyntheticState()}
+      tab="engineering"
+    />,
+  );
+
+  const addAllocationCard = getAddAllocationCard();
+  const allocationCategorySelect = within(addAllocationCard).getByRole("combobox", { name: /Allocation Category/i });
+  const editPendingButton = screen.getByLabelText(/Open pending for edit/i);
+
+  expect(allocationCategorySelect.value).toBe("SCXR");
+  fireEvent.click(editPendingButton);
+  expect(allocationCategorySelect.value).toBe("SCXR");
 });

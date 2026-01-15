@@ -805,6 +805,7 @@ export default function App() {
             <label className="space-y-1 text-xs text-slate-500">
               Name
               <input
+                name="user-name"
                 type="text"
                 value={userIdentity.name}
                 placeholder="Engineer or accountant name"
@@ -815,6 +816,7 @@ export default function App() {
             <label className="space-y-1 text-xs text-slate-500">
               Email
               <input
+                name="user-email"
                 type="email"
                 value={userIdentity.email}
                 placeholder="name@example.com"
@@ -863,6 +865,7 @@ export default function App() {
             </div>
             <div className="mt-3 flex flex-wrap gap-2 items-center">
               <input
+                name="work-order-spreadsheet"
                 ref={csvInputRef}
                 type="file"
                 accept=".xlsx,.xls,.csv"
@@ -879,6 +882,7 @@ export default function App() {
             </div>
             <div className="mt-3 flex flex-wrap gap-2 items-center">
               <input
+                name="state-json"
                 ref={stateInputRef}
                 type="file"
                 accept=".json,application/json"
@@ -927,6 +931,7 @@ export default function App() {
             <div className="space-y-2" ref={searchWrapperRef}>
               <div className="relative">
                 <input
+                  name="history-search"
                   type="text"
                   placeholder="Search by work order or description"
                   className="w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:border-slate-900 focus:ring-0"
