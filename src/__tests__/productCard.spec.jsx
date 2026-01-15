@@ -118,6 +118,30 @@ test('open pending control primes the allocation form', async () => {
   expect(categorySelect.value).toBe("Pending");
 });
 
+test('remove control deletes an allocation so synthetic pending can take its place', async () => {
+  const user = userEvent.setup();
+  const removeAllocation = vi.fn();
+  renderProductCard({
+    getItemState: () => ({
+      base: {},
+      extra: {
+        allocations: [
+          { id: "ALLOC-1", type: "regular", allocationCategory: "Aerial", qty: 2 },
+        ],
+      },
+      totalAvailable: 10,
+      allocatedSum: 2,
+      remaining: 8,
+      pendingReturnSum: 0,
+    }),
+    removeAllocation,
+  });
+
+  const removeButton = screen.getByLabelText(/remove allocation permanently/i);
+  await user.click(removeButton);
+  expect(removeAllocation).toHaveBeenCalledWith("WO-TEST", "ITEM-1", "ALLOC-1");
+});
+
 test('saving a new reel span auto-creates a pending allocation', async () => {
   const user = userEvent.setup();
   const setReelSpan = vi.fn().mockReturnValue({ id: "SPAN-1", start: 100, end: 200 });

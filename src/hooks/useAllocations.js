@@ -450,7 +450,10 @@ export function useAllocations(grouped) {
       inner: bounds.inner,
       footage: Math.abs(bounds.end - bounds.start),
     };
-    const candidateAllocations = [...staged, newAlloc];
+    const filteredStaged = replaceId
+      ? staged.filter((alloc) => alloc.id !== replaceId)
+      : staged;
+    const candidateAllocations = [...filteredStaged, newAlloc];
     const overlap = detectReelOverlap(candidateAllocations, reelSerialKey);
     if (overlap) {
       return { error: `Overlap with existing piece [${overlap.previous.start}–${overlap.previous.end}]` };

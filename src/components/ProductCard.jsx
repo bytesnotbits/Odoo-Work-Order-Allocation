@@ -409,6 +409,24 @@ export default function ProductCard({
     }
   };
 
+  const handleDeleteAllocation = (alloc) => {
+    if (!alloc?.id) return;
+    removeAllocation(wo, product.code, alloc.id);
+    if (selectedAllocation?.id === alloc.id) {
+      setSelectedAllocation(null);
+      setAllocQty("");
+      setAllocId("");
+      setAllocCategory(allocationOptionsForProduct[0]);
+      setAllocCategoryCustom("");
+      setReelSerial("");
+      setOuter("");
+      setInner("");
+      setCoeLocInput("");
+      setRackBayInput("");
+      setSepcatInput(SEPCAT_OPTIONS[0]);
+    }
+  };
+
   const defaultCategory = ALLOCATION_OPTIONS[0] || "";
   const handleSelectAllocation = (alloc) => {
     setSelectedAllocation(alloc);
@@ -904,18 +922,31 @@ export default function ProductCard({
                           {a.type === "reel" ? "Reel piece" : "Quantity allocation"}
                         </div>
                         {!locked && !isSyntheticPendingCard && (
-                          <button
-                            type="button"
-                            className="inline-flex items-center justify-center px-3 py-1 rounded-full border text-[11px] font-semibold uppercase tracking-wide transition"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              handleRevertToPending(a);
-                            }}
-                            aria-label="Revert allocation to pending"
-                            disabled={isPendingReturn}
-                          >
-                            {isPendingReturn ? "Pending" : "Revert to pending"}
-                          </button>
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              className="inline-flex items-center justify-center px-3 py-1 rounded-full border text-[11px] font-semibold uppercase tracking-wide transition"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                handleRevertToPending(a);
+                              }}
+                              aria-label="Revert allocation to pending"
+                              disabled={isPendingReturn}
+                            >
+                              {isPendingReturn ? "Pending" : "Revert to pending"}
+                            </button>
+                            <button
+                              type="button"
+                              className="inline-flex items-center justify-center px-3 py-1 rounded-full border text-[11px] font-semibold uppercase tracking-wide transition border-red-200 bg-white text-red-600 hover:bg-red-50 hover:text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-red-500"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                handleDeleteAllocation(a);
+                              }}
+                              aria-label="Remove allocation permanently"
+                            >
+                              Remove allocation
+                            </button>
+                          </div>
                         )}
                           {isSyntheticPendingCard && (
                             <div className="flex flex-wrap items-center gap-2 text-[11px] text-amber-700 mt-1">
