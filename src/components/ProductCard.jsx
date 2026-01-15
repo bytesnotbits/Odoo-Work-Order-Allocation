@@ -864,20 +864,28 @@ export default function ProductCard({
                         </span>
                       </div>
                       <div className="space-y-1 text-sm">
-                        {reelSpanSummaries.map(({ serial, hasSpan, total, covered, remainingSpan }) => (
-                          hasSpan ? (
+                        {reelSpanSummaries.map(({ serial, hasSpan, total, covered, remainingSpan }) => {
+                          if (!hasSpan) {
+                            return (
+                              <div key={serial} className="text-gray-500">
+                                [{serial}] No span saved for this reel yet.
+                              </div>
+                            );
+                          }
+
+                          if (remainingSpan === 0) {
+                            return null;
+                          }
+
+                          return (
                             <div
                               key={serial}
                               className={`text-gray-600 ${serial === reelSerial ? "text-gray-800 font-semibold" : ""}`}
                             >
                               [{serial}] Span total: <b>{total}</b> | Covered: <b>{covered}</b> | Remaining: <b>{remainingSpan}</b>
                             </div>
-                          ) : (
-                            <div key={serial} className="text-gray-500">
-                              [{serial}] No span saved for this reel yet.
-                            </div>
-                          )
-                        ))}
+                          );
+                        })}
                       </div>
                     </>
                   )}
