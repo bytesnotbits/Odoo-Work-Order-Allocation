@@ -120,6 +120,18 @@ export default function ProductCard({
   useEffect(() => () => {
     Object.values(highlightTimeoutsRef.current).forEach(clearTimeout);
   }, []);
+  const FIELD_KEYS = {
+    ALLOCATION_QTY: "allocation-qty",
+    ALLOCATION_NOTES: "allocation-notes",
+    ALLOCATION_CATEGORY: "allocation-category",
+    CUSTOM_CATEGORY: "custom-category",
+    ENGINEERING_COE_LOC: "engineering-coe-loc",
+    ENGINEERING_RACK_BAY: "engineering-rack-bay",
+    ENGINEERING_SEPCAT: "engineering-sepcat",
+    OPTIONAL_REEL_SERIAL: "optional-reel-serial",
+    REEL_INNER: "reel-inner",
+    REEL_OUTER: "reel-outer",
+  };
   const triggerFieldHighlight = (fieldKey) => {
     if (!fieldKey) return;
     setHighlightedFields((prev) => ({ ...prev, [fieldKey]: true }));
@@ -536,47 +548,46 @@ export default function ProductCard({
     const allocMeta = typeof rawAssetMeta === "object"
       ? rawAssetMeta
       : { assetId: rawAssetMeta ?? "", coeLoc: "", rackBay: "", sepcat: "" };
-    updateFieldWithHighlight(setAllocId, "allocation-notes", alloc.allocationId || "");
+    updateFieldWithHighlight(setAllocId, FIELD_KEYS.ALLOCATION_NOTES, alloc.allocationId || "");
     if (alloc.allocationCategoryIsCustom) {
-      updateFieldWithHighlight(setAllocCategory, "allocation-category", "__custom__");
-      updateFieldWithHighlight(setAllocCategoryCustom, "custom-category", alloc.allocationCategory || "");
+      updateFieldWithHighlight(setAllocCategory, FIELD_KEYS.ALLOCATION_CATEGORY, "__custom__");
+      updateFieldWithHighlight(setAllocCategoryCustom, FIELD_KEYS.CUSTOM_CATEGORY, alloc.allocationCategory || "");
     } else {
-      updateFieldWithHighlight(setAllocCategory, "allocation-category", alloc.allocationCategory || defaultCategory);
-      setAllocCategoryCustom("");
-      triggerFieldHighlight("custom-category");
+      updateFieldWithHighlight(setAllocCategory, FIELD_KEYS.ALLOCATION_CATEGORY, alloc.allocationCategory || defaultCategory);
+      updateFieldWithHighlight(setAllocCategoryCustom, FIELD_KEYS.CUSTOM_CATEGORY, "");
     }
-    updateFieldWithHighlight(setReelSerial, "optional-reel-serial", alloc.reelSerial || "");
+    updateFieldWithHighlight(setReelSerial, FIELD_KEYS.OPTIONAL_REEL_SERIAL, alloc.reelSerial || "");
     if (alloc.type === "reel") {
-      updateFieldWithHighlight(setOuter, "optional-reel-serial", formatSpanInput(alloc.outer));
-      updateFieldWithHighlight(setInner, "optional-reel-serial", formatSpanInput(alloc.inner));
-      updateFieldWithHighlight(setAllocQty, "allocation-qty", "");
+      updateFieldWithHighlight(setOuter, FIELD_KEYS.REEL_OUTER, formatSpanInput(alloc.outer));
+      updateFieldWithHighlight(setInner, FIELD_KEYS.REEL_INNER, formatSpanInput(alloc.inner));
+      updateFieldWithHighlight(setAllocQty, FIELD_KEYS.ALLOCATION_QTY, "");
     } else {
-      updateFieldWithHighlight(setAllocQty, "allocation-qty", alloc.qty != null ? String(alloc.qty) : "");
-      updateFieldWithHighlight(setOuter, "optional-reel-serial", "");
-      updateFieldWithHighlight(setInner, "optional-reel-serial", "");
+      updateFieldWithHighlight(setAllocQty, FIELD_KEYS.ALLOCATION_QTY, alloc.qty != null ? String(alloc.qty) : "");
+      updateFieldWithHighlight(setOuter, FIELD_KEYS.REEL_OUTER, "");
+      updateFieldWithHighlight(setInner, FIELD_KEYS.REEL_INNER, "");
     }
-    updateFieldWithHighlight(setCoeLocInput, "engineering-coe-loc", allocMeta.coeLoc || "");
-    updateFieldWithHighlight(setRackBayInput, "engineering-rack-bay", allocMeta.rackBay || "");
-    updateFieldWithHighlight(setSepcatInput, "engineering-sepcat", allocMeta.sepcat || SEPCAT_OPTIONS[0]);
+    updateFieldWithHighlight(setCoeLocInput, FIELD_KEYS.ENGINEERING_COE_LOC, allocMeta.coeLoc || "");
+    updateFieldWithHighlight(setRackBayInput, FIELD_KEYS.ENGINEERING_RACK_BAY, allocMeta.rackBay || "");
+    updateFieldWithHighlight(setSepcatInput, FIELD_KEYS.ENGINEERING_SEPCAT, allocMeta.sepcat || SEPCAT_OPTIONS[0]);
   };
 
   const primeSyntheticPendingForm = (qty, pendingCardId = null) => {
     setSelectedAllocation(null);
     setSelectedPendingCardId(pendingCardId);
-    updateFieldWithHighlight(setAllocId, "allocation-notes", "");
-    updateFieldWithHighlight(setAllocQty, "allocation-qty", qty != null ? String(qty) : "");
+    updateFieldWithHighlight(setAllocId, FIELD_KEYS.ALLOCATION_NOTES, "");
+    updateFieldWithHighlight(setAllocQty, FIELD_KEYS.ALLOCATION_QTY, qty != null ? String(qty) : "");
     const pendingCategoryAvailable = allocationOptionsForProduct.includes(DEFAULT_PENDING_CATEGORY);
     const pendingFormCategory = pendingCategoryAvailable
       ? DEFAULT_PENDING_CATEGORY
       : allocationOptionsForProduct[0] || DEFAULT_PENDING_CATEGORY;
-    updateFieldWithHighlight(setAllocCategory, "allocation-category", pendingFormCategory);
-    updateFieldWithHighlight(setAllocCategoryCustom, "custom-category", "");
-    updateFieldWithHighlight(setReelSerial, "optional-reel-serial", "");
-    updateFieldWithHighlight(setOuter, "optional-reel-serial", "");
-    updateFieldWithHighlight(setInner, "optional-reel-serial", "");
-    updateFieldWithHighlight(setCoeLocInput, "engineering-coe-loc", "");
-    updateFieldWithHighlight(setRackBayInput, "engineering-rack-bay", "");
-    updateFieldWithHighlight(setSepcatInput, "engineering-sepcat", SEPCAT_OPTIONS[0]);
+    updateFieldWithHighlight(setAllocCategory, FIELD_KEYS.ALLOCATION_CATEGORY, pendingFormCategory);
+    updateFieldWithHighlight(setAllocCategoryCustom, FIELD_KEYS.CUSTOM_CATEGORY, "");
+    updateFieldWithHighlight(setReelSerial, FIELD_KEYS.OPTIONAL_REEL_SERIAL, "");
+    updateFieldWithHighlight(setOuter, FIELD_KEYS.REEL_OUTER, "");
+    updateFieldWithHighlight(setInner, FIELD_KEYS.REEL_INNER, "");
+    updateFieldWithHighlight(setCoeLocInput, FIELD_KEYS.ENGINEERING_COE_LOC, "");
+    updateFieldWithHighlight(setRackBayInput, FIELD_KEYS.ENGINEERING_RACK_BAY, "");
+    updateFieldWithHighlight(setSepcatInput, FIELD_KEYS.ENGINEERING_SEPCAT, SEPCAT_OPTIONS[0]);
   };
 
   const hasUnresolvedQuantities = remaining > 0 || pendingReturnSum > 0;
@@ -712,7 +723,7 @@ export default function ProductCard({
                   <label className="block text-xs font-medium text-slate-500 uppercase tracking-wide">COE LOC</label>
                   <input
                     name={buildInputName("engineering-coe-loc")}
-                    className={`w-full border rounded-xl p-2 transition-colors ${fieldHighlightClasses("engineering-coe-loc")}`}
+                    className={`w-full border rounded-xl p-2 transition-colors ${fieldHighlightClasses(FIELD_KEYS.ENGINEERING_COE_LOC)}`}
                     placeholder="COE LOC"
                     value={coeLocInput}
                     onChange={(e) => setCoeLocInput(e.target.value)}
@@ -722,7 +733,7 @@ export default function ProductCard({
                   <label className="block text-xs font-medium text-slate-500 uppercase tracking-wide">Rack/Bay</label>
                   <input
                     name={buildInputName("engineering-rack-bay")}
-                    className={`w-full border rounded-xl p-2 transition-colors ${fieldHighlightClasses("engineering-rack-bay")}`}
+                    className={`w-full border rounded-xl p-2 transition-colors ${fieldHighlightClasses(FIELD_KEYS.ENGINEERING_RACK_BAY)}`}
                     placeholder="RACK/BAY"
                     value={rackBayInput}
                     onChange={(e) => setRackBayInput(e.target.value)}
@@ -734,7 +745,7 @@ export default function ProductCard({
                   </label>
                   <select
                     id={sepcatFieldId}
-                    className={`w-full border rounded-xl p-2 transition-colors ${fieldHighlightClasses("engineering-sepcat")}`}
+                    className={`w-full border rounded-xl p-2 transition-colors ${fieldHighlightClasses(FIELD_KEYS.ENGINEERING_SEPCAT)}`}
                     value={sepcatInput}
                     onChange={(e) => setSepcatInput(e.target.value)}
                   >
@@ -756,14 +767,14 @@ export default function ProductCard({
                   type="number"
                   min={0}
                   step={1}
-                  className={`w-full border rounded-xl p-2 transition-colors ${fieldHighlightClasses("allocation-qty")}`}
+                  className={`w-full border rounded-xl p-2 transition-colors ${fieldHighlightClasses(FIELD_KEYS.ALLOCATION_QTY)}`}
                   value={allocQty}
                   onChange={(e) => setAllocQty(e.target.value)}
                 />
                 <label className="block text-sm">Allocation notes (optional)</label>
                 <input
                   name={buildInputName("allocation-notes")}
-                  className={`w-full border rounded-xl p-2 transition-colors ${fieldHighlightClasses("allocation-notes")}`}
+                  className={`w-full border rounded-xl p-2 transition-colors ${fieldHighlightClasses(FIELD_KEYS.ALLOCATION_NOTES)}`}
                   value={allocId}
                   onChange={(e) => setAllocId(e.target.value)}
                   placeholder="e.g., AERIAL-FIBER-01"
@@ -773,7 +784,7 @@ export default function ProductCard({
                   <select
                     id={allocationCategoryFieldId}
                     name={buildInputName("allocation-category")}
-                    className={`border rounded-xl p-2 transition-colors ${fieldHighlightClasses("allocation-category")}`}
+                    className={`border rounded-xl p-2 transition-colors ${fieldHighlightClasses(FIELD_KEYS.ALLOCATION_CATEGORY)}`}
                     value={allocCategory}
                     onChange={(e) => setAllocCategory(e.target.value)}
                   >
@@ -783,7 +794,7 @@ export default function ProductCard({
                   {allocCategory === "__custom__" && (
                     <input
                       name={buildInputName("custom-category")}
-                      className={`flex-1 border rounded-xl p-2 transition-colors ${fieldHighlightClasses("custom-category")}`}
+                      className={`flex-1 border rounded-xl p-2 transition-colors ${fieldHighlightClasses(FIELD_KEYS.CUSTOM_CATEGORY)}`}
                       placeholder="Enter custom category"
                       value={allocCategoryCustom}
                       onChange={(e) => setAllocCategoryCustom(e.target.value)}
@@ -793,7 +804,7 @@ export default function ProductCard({
                 <label className="block text-sm mt-2">Reel/Serial Number (optional)</label>
                 <input
                   name={buildInputName("optional-reel-serial")}
-                  className={`w-full border rounded-xl p-2 transition-colors ${fieldHighlightClasses("optional-reel-serial")}`}
+                    className={`w-full border rounded-xl p-2 transition-colors ${fieldHighlightClasses(FIELD_KEYS.OPTIONAL_REEL_SERIAL)}`}
                   value={reelSerial}
                   onChange={(e) => setReelSerial(e.target.value)}
                   placeholder="e.g., REEL-12345 or SN-0001"
@@ -1005,7 +1016,7 @@ export default function ProductCard({
                       <label className="block text-sm">Reel/Serial Number</label>
                       <input
                         name={buildInputName("span-reel-serial")}
-                        className="w-full border rounded-xl p-2"
+                        className={`w-full border rounded-xl p-2 transition-colors ${fieldHighlightClasses(FIELD_KEYS.OPTIONAL_REEL_SERIAL)}`}
                         value={reelSerial}
                         onChange={(e) => {
                           setReelSerial(e.target.value);
@@ -1049,7 +1060,7 @@ export default function ProductCard({
                       <label className="block text-sm">Reel/Serial Number <span className="text-red-500">*</span></label>
                       <input
                         name={buildInputName("piece-reel-serial")}
-                        className="w-full border rounded-xl p-2"
+                        className={`w-full border rounded-xl p-2 transition-colors ${fieldHighlightClasses(FIELD_KEYS.OPTIONAL_REEL_SERIAL)}`}
                         value={reelSerial}
                         onChange={(e) => {
                           setReelSerial(e.target.value);
@@ -1063,7 +1074,7 @@ export default function ProductCard({
                       <input
                         name={buildInputName("piece-inner")}
                         type="number"
-                        className="w-full border rounded-xl p-2"
+                        className={`w-full border rounded-xl p-2 transition-colors ${fieldHighlightClasses(FIELD_KEYS.REEL_INNER)}`}
                         value={inner}
                         onChange={(e) => setInner(e.target.value)}
                       />
@@ -1073,7 +1084,7 @@ export default function ProductCard({
                       <input
                         name={buildInputName("piece-outer")}
                         type="number"
-                        className="w-full border rounded-xl p-2"
+                        className={`w-full border rounded-xl p-2 transition-colors ${fieldHighlightClasses(FIELD_KEYS.REEL_OUTER)}`}
                         value={outer}
                         onChange={(e) => setOuter(e.target.value)}
                       />
@@ -1083,7 +1094,7 @@ export default function ProductCard({
                   <label className="block text-sm mt-2">Allocation notes (optional)</label>
                   <input
                     name={buildInputName("piece-allocation-notes")}
-                    className="w-full border rounded-xl p-2"
+                    className={`w-full border rounded-xl p-2 transition-colors ${fieldHighlightClasses(FIELD_KEYS.ALLOCATION_NOTES)}`}
                     value={allocId}
                     onChange={(e) => setAllocId(e.target.value)}
                     placeholder="e.g., AERIAL-SPAN-12"
@@ -1092,7 +1103,7 @@ export default function ProductCard({
                   <div className="flex gap-2">
                     <select
                       name={buildInputName("piece-allocation-category")}
-                      className="border rounded-xl p-2"
+                      className={`border rounded-xl p-2 transition-colors ${fieldHighlightClasses(FIELD_KEYS.ALLOCATION_CATEGORY)}`}
                       value={allocCategory}
                       onChange={(e) => setAllocCategory(e.target.value)}
                     >
@@ -1102,7 +1113,7 @@ export default function ProductCard({
                     {allocCategory === "__custom__" && (
                       <input
                         name={buildInputName("piece-custom-category")}
-                        className="flex-1 border rounded-xl p-2"
+                        className={`flex-1 border rounded-xl p-2 transition-colors ${fieldHighlightClasses(FIELD_KEYS.CUSTOM_CATEGORY)}`}
                         placeholder="Enter custom category"
                         value={allocCategoryCustom}
                         onChange={(e) => setAllocCategoryCustom(e.target.value)}
