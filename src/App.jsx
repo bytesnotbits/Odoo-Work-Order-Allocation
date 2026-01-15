@@ -106,6 +106,9 @@ export default function App() {
   const { entries: auditEntries, recordAuditEvent } = useAuditTrail();
 
   const userDisplayName = userIdentity.name || userIdentity.email || "Unknown user";
+  const isIdentityComplete =
+    Boolean(userIdentity.name?.trim()) && Boolean(userIdentity.email?.trim());
+  const lockedContentClassName = isIdentityComplete ? "" : "pointer-events-none opacity-60";
 
   const logAuditEvent = useCallback(
     (workOrderId, action, details = "") => {
@@ -828,7 +831,15 @@ export default function App() {
           </div>
         </div>
 
-        <div className="mb-6 flex flex-wrap items-center gap-3 text-xs">
+        <div className="relative">
+          {!isIdentityComplete && (
+            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 rounded-2xl border border-rose-200 bg-white/90 px-6 py-12 text-center text-sm font-semibold text-rose-700 shadow-sm backdrop-blur-sm">
+              <p>Please enter both your name and email above so we can track every action while MS Azure logins are pending.</p>
+              <p className="text-xs text-rose-600">Identity capture unlocks the allocator until the Azure login flow is ready.</p>
+            </div>
+          )}
+          <div className={lockedContentClassName}>
+            <div className="mb-6 flex flex-wrap items-center gap-3 text-xs">
           <div
             className={`px-2 py-1 rounded-full border ${
               hasUnsavedChanges
@@ -1168,6 +1179,9 @@ export default function App() {
           </div>
         </div>
       )}
+        </div>
+      </div>
     </div>
+  </div>
   );
 }
