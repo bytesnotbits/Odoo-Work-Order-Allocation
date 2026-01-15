@@ -738,10 +738,176 @@ export default function ProductCard({
             )}
 
             {cableMode && (
-              <div className="space-y-2">
-                {/* Reel & span */}
-                <div className="bg-white border rounded-xl p-3">
-                  <div className="font-medium mb-1">Reel & span (optional)</div>
+              <div className="space-y-3">
+                <div className="bg-white border rounded-xl p-3 space-y-3">
+                  <div className="font-medium text-sm text-slate-700">Known reels & spans</div>
+                  {knownReels.length === 0 ? (
+                    <div className="text-[11px] text-slate-500">No spans saved for this product yet.</div>
+                  ) : (
+                    <>
+                      <div className="space-y-4">
+                        {knownReels.map((serial) => {
+                          const spans = reelSpanMap[serial] || [];
+                          const timeline = buildReelTimeline(spans);
+                          const allocationSegments = timeline
+                            ? buildAllocationSegments(serial, timeline.minStart, timeline.maxEnd)
+                            : [];
+                          return (
+                            <div key={serial} className="space-y-2">
+                              <div className="flex flex-wrap items-start justify-between gap-3">
+                                <div className="flex items-center gap-2 whitespace-nowrap">
+                                  <button
+                                    type="button"
+                                    className={[
+                                      "px-2 py-1 rounded-full border text-[11px] transition whitespace-nowrap",
+                                      serial === reelSerial
+                                        ? "bg-slate-900 text-white border-slate-900"
+                                        : "bg-white text-slate-900 border-slate-200 hover:bg-slate-50"
+                                    ].join(" ")}
+                                    onClick={() => handleSelectReel(serial)}
+                                  >
+                                    {serial}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="flex items-center justify-center w-5 h-5 rounded-full border border-red-200 text-red-600 text-[10px] bg-white hover:bg-red-50"
+                                    aria-label={`Remove reel ${serial}`}
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      handleRemoveReel(serial);
+                                    }}
+                                  >
+                                    ×
+                                  </button>
+                                </div>
+                                <div className="flex flex-1 min-w-0 gap-2 overflow-x-auto whitespace-nowrap">
+                                  {spans.length > 0 &&
+                                    spans.map((span) => {
+                                      const isActiveSpan =
+                                        span.id === selectedSpanId;
+                                      return (
+                                        <button
+                                          type="button"
+                                          key={span.id}
+                                          className={[
+                                            "px-2 py-1 rounded-full border text-[11px] transition whitespace-nowrap text-center min-w-[84px]",
+                                            isActiveSpan
+                                              ? "bg-slate-900 text-white border-slate-900"
+                                              : "bg-white text-slate-900 border-slate-200 hover:bg-slate-50"
+                                          ].join(" ")}
+                                          onClick={() =>
+                                            handleSelectSpan(serial, span)
+                                          }
+                                        >
+                                          [{span.start}–{span.end}]
+                                        </button>
+                                      );
+                                    })}
+                                </div>
+                              </div>
+                              <div>
+                                {timeline ? (
+                                  <div className="space-y-1 text-[11px] text-slate-500">
+                                    <div className="relative h-2.5 rounded-full bg-slate-100 overflow-hidden shadow-inner">
+                                      {timeline.segments.map((segment, idx) => (
+                                        <span
+                                          key={`span-${serial}-${segment.id ?? idx}`}
+                                          className="absolute inset-y-0 rounded-full bg-slate-800/90 transition-all"
+                                          style={{
+                                            left: `${segment.startPercent}%`,
+                                            width: `${Math.min(Math.max(segment.widthPercent, 0), 100)}%`,
+                                          }}
+                                          title={`${segment.label}`}
+                                        />
+                                      ))}
+                                      {allocationSegments.map((segment) => (
+                                        <span
+                                          key={`alloc-${serial}-${segment.id}`}
+                                          className={`absolute inset-y-0 rounded-full opacity-90 ${getAllocationSegmentClass(
+                                            segment.allocation,
+                                          )} z-10`}
+                                          style={{
+                                            left: `${segment.startPercent}%`,
+                                            width: `${Math.min(Math.max(segment.widthPercent, 0), 100)}%`,
+                                          }}
+                                          title={`${segment.allocation.allocationId || "Allocation"} ${segment.allocation.allocationCategory || ""}`.trim()}
+                                        />
+                                      ))}
+                                    </div>
+                                    <div className="flex justify-between text-[10px] text-slate-400 uppercase tracking-wide">
+                                      <span>from {formatTimelineValue(timeline.minStart)}</span>
+                                      <span>to {formatTimelineValue(timeline.maxEnd)}</span>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="text-[11px] text-slate-400">
+                                    Timeline: no spans recorded yet.
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div className="flex flex-wrap gap-3 text-[10px] text-slate-500">
+                        <span className="flex items-center gap-1">
+                          <span className="h-2 w-2 rounded-full bg-sky-500/90 border border-sky-400/80" />
+                          Allocated
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <span className="h-2 w-2 rounded-full bg-amber-400/90 border border-amber-300/80" />
+                          Pending
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <span className="h-2 w-2 rounded-full bg-slate-400/90 border border-slate-300/80" />
+                          Returned
+                        </span>
+                      </div>
+                      <div className="space-y-1 text-sm">
+                        {reelSpanSummaries.map(({ serial, hasSpan, total, covered, remainingSpan }) => (
+                          hasSpan ? (
+                            <div
+                              key={serial}
+                              className={`text-gray-600 ${serial === reelSerial ? "text-gray-800 font-semibold" : ""}`}
+                            >
+                              [{serial}] Span total: <b>{total}</b> | Covered: <b>{covered}</b> | Remaining: <b>{remainingSpan}</b>
+                            </div>
+                          ) : (
+                            <div key={serial} className="text-gray-500">
+                              [{serial}] No span saved for this reel yet.
+                            </div>
+                          )
+                        ))}
+                      </div>
+                    </>
+                  )}
+                  {spanBounds && (
+                    <div className="mt-3 text-sm">
+                      {missingSegments.length === 0 ? (
+                        <div className="text-emerald-700 font-semibold">Span fully accounted for</div>
+                      ) : (
+                        <div className="space-y-1">
+                          <div className="text-[11px] uppercase tracking-wide text-amber-600 font-semibold">
+                            Unaccounted span segments
+                          </div>
+                          <ul className="list-disc list-inside text-amber-700">
+                            {missingSegments.map((segment, idx) => (
+                              <li key={`${segment.start}-${segment.end}-${idx}`} className="leading-tight">
+                                <span className="font-semibold text-amber-900">
+                                  [{segment.start}–{segment.end}]
+                                </span>{" "}
+                                {Math.abs(segment.end - segment.start)} ft unallocated / missing
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div className="bg-white border rounded-xl p-3 space-y-3">
+                  <div className="font-medium text-sm text-slate-700">Reel & span (optional)</div>
                   <div className="grid md:grid-cols-3 gap-2">
                     <div>
                       <label className="block text-sm">Reel/Serial Number</label>
@@ -754,229 +920,62 @@ export default function ProductCard({
                         }}
                         placeholder="REEL-XXXXX"
                       />
-                      {knownReels.length > 0 && (
-                        <div className="text-xs text-gray-600 mt-1">
-                          <div className="text-[11px] uppercase tracking-wide mb-1 text-slate-500">Known reels & spans</div>
-                          <div className="space-y-2">
-                            {knownReels.map((serial) => {
-                              const spans = reelSpanMap[serial] || [];
-                              const timeline = buildReelTimeline(spans);
-                              const allocationSegments = timeline
-                                ? buildAllocationSegments(serial, timeline.minStart, timeline.maxEnd)
-                                : [];
-                              return (
-                                <div
-                                  key={serial}
-                                  className="grid w-full items-center gap-2 sm:grid-cols-[auto,1fr]"
-                                >
-                                  <div className="flex items-center gap-2 whitespace-nowrap">
-                                    <button
-                                      type="button"
-                                      className={[
-                                        "px-2 py-1 rounded-full border text-[11px] transition whitespace-nowrap",
-                                        serial === reelSerial
-                                          ? "bg-slate-900 text-white border-slate-900"
-                                          : "bg-white text-slate-900 border-slate-200 hover:bg-slate-50"
-                                      ].join(" ")}
-                                      onClick={() => handleSelectReel(serial)}
-                                    >
-                                      {serial}
-                                    </button>
-                                    <button
-                                      type="button"
-                                      className="flex items-center justify-center w-5 h-5 rounded-full border border-red-200 text-red-600 text-[10px] bg-white hover:bg-red-50"
-                                      aria-label={`Remove reel ${serial}`}
-                                      onClick={(event) => {
-                                        event.stopPropagation();
-                                        handleRemoveReel(serial);
-                                      }}
-                                    >
-                                      ×
-                                    </button>
-                                  </div>
-                                  <div className="flex flex-wrap gap-2 sm:flex-nowrap min-w-0">
-                                    {spans.length > 0 &&
-                                      spans.map((span) => {
-                                        const isActiveSpan =
-                                          span.id === selectedSpanId;
-                                        return (
-                                          <button
-                                            type="button"
-                                            key={span.id}
-                                            className={[
-                                              "px-2 py-1 rounded-full border text-[11px] transition whitespace-nowrap text-center min-w-[84px]",
-                                              isActiveSpan
-                                                ? "bg-slate-900 text-white border-slate-900"
-                                                : "bg-white text-slate-900 border-slate-200 hover:bg-slate-50"
-                                            ].join(" ")}
-                                            onClick={() =>
-                                              handleSelectSpan(serial, span)
-                                            }
-                                          >
-                                            [{span.start}–{span.end}]
-                                          </button>
-                                        );
-                                      })}
-                                  </div>
-                                  <div className="col-span-full mt-1">
-                                    {timeline ? (
-                                      <div className="space-y-1 text-[11px] text-slate-500">
-                                        <div className="relative h-2.5 rounded-full bg-slate-100 overflow-hidden shadow-inner">
-                                          {timeline.segments.map((segment, idx) => (
-                                            <span
-                                              key={`span-${serial}-${segment.id ?? idx}`}
-                                              className="absolute inset-y-0 rounded-full bg-slate-800/90 transition-all"
-                                              style={{
-                                                left: `${segment.startPercent}%`,
-                                                width: `${Math.min(Math.max(segment.widthPercent, 0), 100)}%`,
-                                              }}
-                                              title={`${segment.label}`}
-                                            />
-                                          ))}
-                                          {allocationSegments.map((segment) => (
-                                            <span
-                                              key={`alloc-${serial}-${segment.id}`}
-                                              className={`absolute inset-y-0 rounded-full opacity-90 ${getAllocationSegmentClass(
-                                                segment.allocation,
-                                              )} z-10`}
-                                              style={{
-                                                left: `${segment.startPercent}%`,
-                                                width: `${Math.min(Math.max(segment.widthPercent, 0), 100)}%`,
-                                              }}
-                                              title={`${segment.allocation.allocationId || "Allocation"} ${segment.allocation.allocationCategory || ""}`.trim()}
-                                            />
-                                          ))}
-                                        </div>
-                                        <div className="flex justify-between text-[10px] text-slate-400 uppercase tracking-wide">
-                                          <span>from {formatTimelineValue(timeline.minStart)}</span>
-                                          <span>to {formatTimelineValue(timeline.maxEnd)}</span>
-                                        </div>
-                                      </div>
-                                    ) : (
-                                      <div className="text-[11px] text-slate-400">
-                                        Timeline: no spans recorded yet.
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                            <div className="mt-1 flex flex-wrap gap-3 text-[10px] text-slate-500">
-                              <span className="flex items-center gap-1">
-                                <span className="h-2 w-2 rounded-full bg-sky-500/90 border border-sky-400/80" />
-                                Allocated
-                              </span>
-                              <span className="flex items-center gap-1">
-                                <span className="h-2 w-2 rounded-full bg-amber-400/90 border border-amber-300/80" />
-                                Pending
-                              </span>
-                              <span className="flex items-center gap-1">
-                                <span className="h-2 w-2 rounded-full bg-slate-400/90 border border-slate-300/80" />
-                                Returned
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      )}
                     </div>
                     <div>
                       <label className="block text-sm">Inner Seq</label>
-                      <input type="number" className="w-full border rounded-xl p-2" value={spanStartInput} onChange={(e)=>setSpanStartInput(e.target.value)} />
+                      <input type="number" className="w-full border rounded-xl p-2" value={spanStartInput} onChange={(e) => setSpanStartInput(e.target.value)} />
                     </div>
                     <div>
                       <label className="block text-sm">Outer Seq</label>
-                      <input type="number" className="w-full border rounded-xl p-2" value={spanEndInput} onChange={(e)=>setSpanEndInput(e.target.value)} />
+                      <input type="number" className="w-full border rounded-xl p-2" value={spanEndInput} onChange={(e) => setSpanEndInput(e.target.value)} />
                     </div>
                   </div>
-    <div className="mt-2">
-      <button disabled={locked} onClick={handleSaveSpan} className={primaryButton + " px-3 py-1"}>
-        Save span
-      </button>
-    </div>
-                  {/* Coverage summary */}
-                {knownReels.length === 0 ? (
-                  <div className="text-sm text-gray-500 mt-2">No spans saved for this product yet.</div>
-                ) : (
-                  <div className="space-y-1 text-sm mt-2">
-                    {reelSpanSummaries.map(({ serial, hasSpan, total, covered, remainingSpan }) => (
-                      hasSpan ? (
-                        <div
-                          key={serial}
-                          className={`text-gray-600 ${serial === reelSerial ? "text-gray-800 font-semibold" : ""}`}
-                        >
-                          [{serial}] Span total: <b>{total}</b> | Covered: <b>{covered}</b> | Remaining: <b>{remainingSpan}</b>
-                        </div>
-                      ) : (
-                        <div key={serial} className="text-gray-500">
-                          [{serial}] No span saved for this reel yet.
-                        </div>
-                      )
-                    ))}
+                  <div className="mt-2">
+                    <button disabled={locked} onClick={handleSaveSpan} className={primaryButton + " px-3 py-1"}>
+                      Save span
+                    </button>
                   </div>
-                )}
-                {spanBounds && (
-                  <div className="mt-3 text-sm">
-                    {missingSegments.length === 0 ? (
-                      <div className="text-emerald-700 font-semibold">Span fully accounted for</div>
-                    ) : (
-                      <div className="space-y-1">
-                        <div className="text-[11px] uppercase tracking-wide text-amber-600 font-semibold">
-                          Unaccounted span segments
-                        </div>
-                        <ul className="list-disc list-inside text-amber-700">
-                          {missingSegments.map((segment, idx) => (
-                            <li key={`${segment.start}-${segment.end}-${idx}`} className="leading-tight">
-                              <span className="font-semibold text-amber-900">
-                                [{segment.start}–{segment.end}]
-                              </span>{" "}
-                              {Math.abs(segment.end - segment.start)} ft unallocated / missing
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
+                </div>
+
+                <div className="bg-white border rounded-xl p-3 space-y-3">
+                  <div className="flex items-center gap-2"><Ruler className="w-4 h-4" /> <div className="font-medium">Reel piece</div></div>
+                  <div className="grid md:grid-cols-3 gap-2">
+                    <div>
+                      <label className="block text-sm">Reel/Serial Number <span className="text-red-500">*</span></label>
+                      <input
+                        className="w-full border rounded-xl p-2"
+                        value={reelSerial}
+                        onChange={(e) => {
+                          setReelSerial(e.target.value);
+                          setSelectedSpanId("");
+                        }}
+                        placeholder="REEL-XXXXX"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm">Inner Seq</label>
+                      <input type="number" className="w-full border rounded-xl p-2" value={inner} onChange={(e) => setInner(e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="block text-sm">Outer Seq</label>
+                      <input type="number" className="w-full border rounded-xl p-2" value={outer} onChange={(e) => setOuter(e.target.value)} />
+                    </div>
+                  </div>
+                  <div className="text-sm text-gray-600">Footage = |Inner − Outer| → <b>{reelFootage}</b></div>
+                  <label className="block text-sm mt-2">Allocation notes (optional)</label>
+                  <input className="w-full border rounded-xl p-2" value={allocId} onChange={(e) => setAllocId(e.target.value)} placeholder="e.g., AERIAL-SPAN-12" />
+                  <label className="block text-sm mt-2">Allocation Category</label>
+                  <div className="flex gap-2">
+                    <select className="border rounded-xl p-2" value={allocCategory} onChange={(e) => setAllocCategory(e.target.value)}>
+                      {ALLOCATION_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
+                      <option value="__custom__">Custom…</option>
+                    </select>
+                    {allocCategory === "__custom__" && (
+                      <input className="flex-1 border rounded-xl p-2" placeholder="Enter custom category" value={allocCategoryCustom} onChange={(e) => setAllocCategoryCustom(e.target.value)} />
                     )}
                   </div>
-                )}
-              </div>
-
-                {/* Reel piece */}
-                <div className="flex items-center gap-2"><Ruler className="w-4 h-4" /> <div className="font-medium">Reel piece</div></div>
-                <div className="grid md:grid-cols-3 gap-2">
-                  <div>
-                    <label className="block text-sm">Reel/Serial Number <span className="text-red-500">*</span></label>
-                    <input
-                      className="w-full border rounded-xl p-2"
-                      value={reelSerial}
-                      onChange={(e) => {
-                        setReelSerial(e.target.value);
-                        setSelectedSpanId("");
-                      }}
-                      placeholder="REEL-XXXXX"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm">Inner Seq</label>
-                    <input type="number" className="w-full border rounded-xl p-2" value={inner} onChange={(e) => setInner(e.target.value)} />
-                  </div>
-                  <div>
-                    <label className="block text-sm">Outer Seq</label>
-                    <input type="number" className="w-full border rounded-xl p-2" value={outer} onChange={(e) => setOuter(e.target.value)} />
-                  </div>
+                  <button disabled={locked} onClick={addReelPiece} className={primaryButton}><Plus className="w-4 h-4" /> Add piece</button>
                 </div>
-                <div className="text-sm text-gray-600">Footage = |Inner − Outer| → <b>{reelFootage}</b></div>
-                <label className="block text-sm">Allocation notes (optional)</label>
-                <input className="w-full border rounded-xl p-2" value={allocId} onChange={(e) => setAllocId(e.target.value)} placeholder="e.g., AERIAL-SPAN-12" />
-                <label className="block text-sm mt-2">Allocation Category</label>
-                <div className="flex gap-2">
-                  <select className="border rounded-xl p-2" value={allocCategory} onChange={(e) => setAllocCategory(e.target.value)}>
-                    {ALLOCATION_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
-                    <option value="__custom__">Custom…</option>
-                  </select>
-                  {allocCategory === "__custom__" && (
-                    <input className="flex-1 border rounded-xl p-2" placeholder="Enter custom category" value={allocCategoryCustom} onChange={(e) => setAllocCategoryCustom(e.target.value)} />
-                  )}
-                </div>
-                <button disabled={locked} onClick={addReelPiece} className={primaryButton}><Plus className="w-4 h-4" /> Add piece</button>
               </div>
             )}
           </div>
@@ -1005,8 +1004,6 @@ export default function ProductCard({
                 const showAssetIdField = !hideAssetFields && !isScxrProduct;
                 const showAssetMetaSection = showAssetIdField || showCoeFields;
                 const numericValue = a.type === "reel" ? a.footage : a.qty;
-                const outerValue = a.type === "reel" ? (a.outer ?? "—") : "—";
-                const innerValue = a.type === "reel" ? (a.inner ?? "—") : "—";
                 const chipBase = "px-2 py-1 rounded-full border text-[11px] font-semibold uppercase tracking-wide";
                 const chipColor = isPendingReturn
                   ? "border-yellow-200 bg-yellow-50 text-yellow-700"
@@ -1092,17 +1089,11 @@ export default function ProductCard({
                           )}
                       </div>
                       {a.type === "reel" && (
-                        <div className="flex flex-wrap gap-2 mt-2 text-[11px]">
-                          <span className={`${chipBase} ${chipColor}`}>
-                            Reel Number: <b>{a.reelSerial || "—"}</b>
-                          </span>
-                          <span className={`${chipBase} ${chipColor}`}>
-                            Inner: <b>{innerValue}</b>
-                          </span>
-                          <span className={`${chipBase} ${chipColor}`}>
-                            Outer: <b>{outerValue}</b>
-                          </span>
-                        </div>
+                      <div className="flex flex-wrap gap-2 mt-2 text-[11px]">
+                        <span className={`${chipBase} ${chipColor}`}>
+                          Reel Number: <b>{a.reelSerial || "—"}</b>
+                        </span>
+                      </div>
                       )}
                       <div className="flex flex-wrap gap-2 mt-2 text-[11px]">
                         <span className={`${chipBase} ${chipColor}`}>

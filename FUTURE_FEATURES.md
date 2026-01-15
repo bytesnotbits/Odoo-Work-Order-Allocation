@@ -1,8 +1,12 @@
-## Future Features & Discussions
+# Future Features & Enhancements
+
+## Enhancements
 
 ### Work Order Locking / Unlocking
 - Engineers lock a work order via `lockWorkOrder` (`src/hooks/useAllocations.js`) once allocations are verified. This sets `allocState[k].locked = true`, and the UI (WOView/ProductCard) disables edits.
 - Request: allow accountants to unlock/return a work order if issues are found so engineers can adjust allocations again. Potential approach: add `unlockWorkOrder` in the hook, expose it to `App`, and provide a “Return to engineering” control (e.g., tied to history entry status changes) so the two sides coordinate around an explicit status transition.
+
+## Future
 
 ### Notifications & Audit Trail
 - Future plan: tie the status history changes (open → submitted → returned) to both an unlock flow and a notification system so accounting gets notified when a work order is ready or returned.
@@ -27,14 +31,14 @@
 - The chatbot would then be able to answer user questions or walk them through specific tasks (“How do I convert a pending allocation to a reel?”) by referencing the manual, ensuring consistent, step-by-step guidance without requiring an engineer to study a manual in order to utilize the app.
 - Maybe have a portion of the app house a chatwindow the user can use to access HCTC's internal AI suite for convenience.
 
-## New Features/Enhancements
-### Add a span lineage visualization so the user can easily visualize how each span is broken up into pieces.
 
 ### Connect Odoo via API and pull all the material moves involving work orders.
-#### Create a comparison between, what Odoo shows to be charged, what was actually charged. This shoudl take returns into account.
+#### Create a comparison between, what Odoo shows to be charged, what was actually charged. This should take returns into account.
 
 ### Connect to NISC via API so that the work order data is automatically populated in real-time and does not require the user to upload CSVs manually.
 
 ### Create a centralized database that becomes one source of truth.
 
 ### Setup MS Teams messaging and MS Azure authentication
+
+### Implement the ability for the app to recognize work order revisions
