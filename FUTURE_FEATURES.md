@@ -37,6 +37,11 @@
 
 ### Connect to NISC via API so that the work order data is automatically populated in real-time and does not require the user to upload CSVs manually.
 
+### Shared backend database (interim)
+- Provide a temporary shared data store on the LAN so multiple users can collaborate without manual JSON exports.
+- Use a small LAN API with SQLite on a dedicated machine; the app reads/writes over HTTP and the DB stays local to that host.
+- Capture audit history (who/when) and enforce charge-out rules consistently while the SQL backend is pending.
+
 ### Create a centralized SQL database that becomes one source of truth.
 ### Have this DB hosted by HCTC behind MS Azure authentication
 
