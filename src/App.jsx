@@ -110,8 +110,6 @@ export default function App() {
   const {
     entries: workOrderHistory,
     upsertEntry: upsertHistoryEntry,
-    removeEntry: removeHistoryEntry,
-    clearHistory,
     setEntryStatus,
   } = useWorkOrderHistory();
   const { entries: auditEntries, recordAuditEvent } = useAuditTrail();
@@ -292,6 +290,7 @@ export default function App() {
     setCableMode,
     addReelAllocation,
     updateAllocation,
+    resetItem,
   } = useAllocations(groupedWithMisc);
 
   const handleUpsertAllocation = useCallback(
@@ -676,42 +675,15 @@ export default function App() {
     userDisplayName,
   ]);
 
-  const clearWorkOrderUserData = useCallback(
-    (woId) => {
-      if (!woId) return;
-      const prefix = `${woId}|`;
-      setAllocState((prev) => {
-        const keys = Object.keys(prev).filter((key) => key.startsWith(prefix));
-        if (keys.length === 0) return prev;
-        const next = { ...prev };
-        keys.forEach((key) => delete next[key]);
-        return next;
-      });
-      setMiscEntries((prev) => {
-        if (!prev[woId]) return prev;
-        const { [woId]: _, ...rest } = prev;
-        return rest;
-      });
-      setWorkOrderNotes((prev) => {
-        if (!prev[woId]) return prev;
-        const { [woId]: _, ...rest } = prev;
-        return rest;
-      });
+  const handleItemReset = useCallback(
+    (woId, code, description) => {
+      if (!woId || !code) return;
+      resetItem(woId, code);
+      const detail = description ? `[${code}] ${description}` : `[${code}]`;
+      logAuditEvent(woId, "Reset item", `Cleared allocations and asset data for ${detail}`);
     },
-    [setAllocState, setMiscEntries, setWorkOrderNotes],
+    [resetItem, logAuditEvent],
   );
-
-  const handleHistoryEntryStartOver = (entry) => {
-    if (!entry?.id) return;
-    clearWorkOrderUserData(entry.id);
-    setSelectedWO(entry.id);
-    setAllowImplicitSelection(true);
-    logAuditEvent(
-      entry.id,
-      "Reset work order",
-      "Cleared user-added allocations, notes, and misc entries",
-    );
-  };
 
   const formatTimestamp = (value) => {
     if (!value) return "";
@@ -735,7 +707,7 @@ export default function App() {
 
   const snapshotSourceLabel = localSnapshot?.source === "indexedDB" ? "IndexedDB" : "browser storage";
   
-  const HistoryEntryCard = ({ entry, highlight = false, onStartOver }) => {
+  const HistoryEntryCard = ({ entry, highlight = false }) => {
     const statusDefinition = WORK_ORDER_HISTORY_STATUSES.find(
       (statusOption) => statusOption.value === entry.status,
     );
@@ -784,13 +756,6 @@ export default function App() {
             className="rounded-2xl border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 hover:border-slate-300"
           >
             Export
-          </button>
-          <button
-            type="button"
-            onClick={() => onStartOver?.(entry)}
-            className="rounded-2xl border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-rose-600 hover:border-rose-300"
-          >
-            Start over
           </button>
         </div>
       </div>
@@ -989,17 +954,9 @@ export default function App() {
               <div>
                 <div className="font-medium">Work order history</div>
                 <div className="text-xs text-slate-500">
-                  Search, load, export, or remove any work order you have opened.
+                  Search, load, or export any work order you have opened.
                 </div>
               </div>
-              <button
-                type="button"
-                disabled={workOrderHistory.length === 0}
-                onClick={clearHistory}
-                className="rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-medium text-rose-700 disabled:opacity-40"
-              >
-                Clear history
-              </button>
             </div>
 
             <div className="space-y-2" ref={searchWrapperRef}>
@@ -1069,7 +1026,7 @@ export default function App() {
               {featuredHistoryEntry ? (
                 <>
                   <div className="text-xs text-slate-500">Currently open work order</div>
-                  <HistoryEntryCard entry={featuredHistoryEntry} highlight onStartOver={handleHistoryEntryStartOver} />
+                  <HistoryEntryCard entry={featuredHistoryEntry} highlight />
                 </>
               ) : (
                 <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-xs text-slate-500">
@@ -1180,6 +1137,7 @@ export default function App() {
                 updateAllocation={handleUpdateAllocation}
                 tab={tab}
                 allocState={allocState}
+                onResetItem={handleItemReset}
                 addMiscEntry={(itemNumber, description) => registerMiscEntry(activeWO, itemNumber, description)} // ensures function bound to current work order
                 removeMiscEntry={(code) => removeMiscEntry(activeWO, code)}
                 nextMiscCode={nextMiscCode}

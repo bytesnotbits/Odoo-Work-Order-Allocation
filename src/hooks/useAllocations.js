@@ -332,6 +332,17 @@ export function useAllocations(grouped) {
     });
   };
 
+  const resetItem = (wo, code) => {
+    if (!wo || !code) return;
+    setAllocState((prev) => {
+      const k = keyOf(wo, code);
+      if (!prev[k]) return prev;
+      const next = { ...prev };
+      delete next[k];
+      return next;
+    });
+  };
+
   // Validation + lock
   const lockWorkOrder = (wo) => {
     const gm = grouped.get(wo);
@@ -591,5 +602,6 @@ export function useAllocations(grouped) {
     removeReelSpanEntry,
     updateReelSpan,
     setSpanChargeoutVisibility,
+    resetItem,
   };
 }

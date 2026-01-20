@@ -33,7 +33,7 @@ export default function ProductCard({
   wo, product, getItemState,
   upsertAllocation, removeAllocation, setAssetMeta,
   setReelSpan, removeReelSpan, getReelSpan, listReels, getReelSpanMap, setCableMode, addReelAllocation, updateAllocation, tab, locked,
-  isMiscRemovable = false, onRemoveMisc
+  isMiscRemovable = false, onRemoveMisc, onResetItem
 }) {
   // Avoid throwing in test environment where window.alert is "not implemented"
   const safeAlert = (msg) => {
@@ -699,33 +699,63 @@ export default function ProductCard({
     { label: "Allocated", value: allocatedSum, tone: "emerald", title: "Footage recorded as allocated" },
     { label: "To Allocate", value: remaining, tone: toAllocateTone, title: "Footage that still needs allocation" },
   ];
+  const hasItemState =
+    extra.allocations.length > 0 ||
+    Object.keys(extra.assets || {}).length > 0 ||
+    Object.keys(extra.reels || {}).length > 0 ||
+    Object.keys(extra.coe || {}).length > 0 ||
+    Object.keys(extra.chargeouts || {}).length > 0 ||
+    extra.cableMode ||
+    extra.locked;
+  const canResetItem = Boolean(onResetItem) && hasItemState;
 
   return (
     <div className={`rounded-2xl p-4 border ${cardStateClasses}`}>
       <div className="flex-1">
         <div className="flex items-start justify-between gap-3">
           <div className="font-semibold text-base md:text-lg">[{product.code}] {product.desc || "Unnamed"}</div>
-          {isMiscProduct && onRemoveMisc && (
-            <button
-              type="button"
-              className={[
-                "flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide px-2 py-1 rounded-full border transition",
-                (!isMiscRemovable || locked)
-                  ? "border-gray-200 bg-white text-gray-400 cursor-not-allowed"
-                  : "border-red-200 bg-white text-red-600 hover:bg-red-50 hover:text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-red-500"
-              ].join(" ")}
-              onClick={(event) => {
-                event.stopPropagation();
-                if (!isMiscRemovable || locked) return;
-                onRemoveMisc();
-              }}
-              disabled={!isMiscRemovable || locked}
-              title={(!isMiscRemovable || locked) ? "Cannot remove this item once imported or locked" : "Remove this miscellaneous item"}
-            >
-              <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
-              <span>Remove</span>
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {onResetItem && (
+              <button
+                type="button"
+                className={[
+                  "flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide px-2 py-1 rounded-full border transition",
+                  canResetItem
+                    ? "border-rose-200 bg-white text-rose-600 hover:bg-rose-50 hover:text-rose-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-rose-500"
+                    : "border-gray-200 bg-white text-gray-400 cursor-not-allowed"
+                ].join(" ")}
+                onClick={() => {
+                  if (!canResetItem) return;
+                  onResetItem(wo, product.code, product.desc || "");
+                }}
+                disabled={!canResetItem}
+                title={canResetItem ? "Reset allocations, assets, reels, and chargeout data for this item" : "No item data to reset"}
+              >
+                <span>Reset item</span>
+              </button>
+            )}
+            {isMiscProduct && onRemoveMisc && (
+              <button
+                type="button"
+                className={[
+                  "flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide px-2 py-1 rounded-full border transition",
+                  (!isMiscRemovable || locked)
+                    ? "border-gray-200 bg-white text-gray-400 cursor-not-allowed"
+                    : "border-red-200 bg-white text-red-600 hover:bg-red-50 hover:text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-red-500"
+                ].join(" ")}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  if (!isMiscRemovable || locked) return;
+                  onRemoveMisc();
+                }}
+                disabled={!isMiscRemovable || locked}
+                title={(!isMiscRemovable || locked) ? "Cannot remove this item once imported or locked" : "Remove this miscellaneous item"}
+              >
+                <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
+                <span>Remove</span>
+              </button>
+            )}
+          </div>
         </div>
         <div className="flex flex-wrap gap-2 mt-1 text-[11px]">
           {summaryChips.map(({ label, value, tone, title }) => (

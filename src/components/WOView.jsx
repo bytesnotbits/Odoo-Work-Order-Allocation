@@ -9,7 +9,7 @@ export default function WOView({
   wo, grouped, baseGrouped, getItemState, upsertAllocation, removeAllocation,
   setAssetMeta, setReelSpan, removeReelSpan, getReelSpan, listReels, getReelSpanMap, lockWorkOrder, tab, allocState, setCableMode,
   addReelAllocation, updateAllocation,
-  addMiscEntry, removeMiscEntry, nextMiscCode,
+  addMiscEntry, removeMiscEntry, nextMiscCode, onResetItem,
 }) {
   const gm = grouped.get(wo) || new Map();
   const [miscDescription, setMiscDescription] = useState("");
@@ -178,6 +178,7 @@ export default function WOView({
           locked={(allocState[`${wo}|${p.code}`]?.locked) || false}
           isMiscRemovable={removableMisc}
           onRemoveMisc={canRemoveMisc ? () => removeMiscEntry?.(p.code) : undefined}
+          onResetItem={onResetItem}
         />
       )})}
 

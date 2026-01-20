@@ -6,6 +6,10 @@
 - Engineers lock a work order via `lockWorkOrder` (`src/hooks/useAllocations.js`) once allocations are verified. This sets `allocState[k].locked = true`, and the UI (WOView/ProductCard) disables edits.
 - Request: allow accountants to unlock/return a work order if issues are found so engineers can adjust allocations again. Potential approach: add `unlockWorkOrder` in the hook, expose it to `App`, and provide a “Return to engineering” control (e.g., tied to history entry status changes) so the two sides coordinate around an explicit status transition.
 
+### Per-Item Reset (Replace Global Clear History)
+- Request: replace any global "clear history" action with a per-item reset control.
+- Behavior: reset all assets for that specific item back to default values so the engineer can start fresh on just that item, without touching other items on the work order.
+
 ## Future
 
 ### Notifications & Audit Trail
