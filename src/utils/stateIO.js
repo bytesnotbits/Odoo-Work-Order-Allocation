@@ -10,6 +10,8 @@ function defaultFilename() {
 }
 
 export function buildStatePayload({ rawRows, miscEntries, workOrderNotes, allocState, selectedWO, tab }) {
+  const normalizedTab =
+    tab === "accounting" || tab === "engineering" || tab === "chargeout" ? tab : "engineering";
   return {
     schemaVersion: 1,
     exportedAt: new Date().toISOString(),
@@ -18,7 +20,7 @@ export function buildStatePayload({ rawRows, miscEntries, workOrderNotes, allocS
     workOrderNotes: isObject(workOrderNotes) ? workOrderNotes : {},
     allocState: isObject(allocState) ? allocState : {},
     selectedWO: selectedWO || "",
-    tab: tab === "accounting" ? "accounting" : "engineering",
+    tab: normalizedTab,
   };
 }
 

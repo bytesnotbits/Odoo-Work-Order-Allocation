@@ -5,6 +5,7 @@ import { FileUp, Package2, Split, Download } from "lucide-react";
 import Section from "./components/Section";
 import Badge from "./components/Badge";
 import WOView from "./components/WOView";
+import CableReelChargeoutPrototype from "./components/CableReelChargeoutPrototype";
 
 import { MISC_PRODUCT_CODE, MISC_PRODUCT_DESC, MISC_PRODUCT_PREFIX } from "./lib/data";
 import { normalizeRow, groupRows } from "./lib/rows";
@@ -23,15 +24,22 @@ import "./App.css";
 
 const APP_VERSION = packageJson.version;
 
+const TAB_OPTIONS = [
+  { value: "engineering", label: "Engineer" },
+  { value: "accounting", label: "Accountant" },
+  { value: "chargeout", label: "Material Charge-out" },
+];
+const DEFAULT_TAB = "engineering";
 const HISTORY_STATUS_FILTERS = [
   { value: "all", label: "All" },
   ...WORK_ORDER_HISTORY_STATUSES,
 ];
 const DROPDOWN_SUGGESTION_LIMIT = 6;
+const isValidTab = (value) => TAB_OPTIONS.some((option) => option.value === value);
 export default function App() {
   const [rawRows, setRawRows] = useState([]);
   const [selectedWO, setSelectedWO] = useState("");
-  const [tab, setTab] = useState("engineering"); // "engineering" | "accounting"
+  const [tab, setTab] = useState(DEFAULT_TAB); // "engineering" | "accounting" | "chargeout"
   const stateInputRef = useRef(null);
   const csvInputRef = useRef(null);
   const [localSnapshot, setLocalSnapshot] = useState(null);
@@ -277,6 +285,9 @@ export default function App() {
     getReelSpan,
     listReels,
     getReelSpanMap,
+    getReelChargeout,
+    setReelChargeout,
+    listReelSpans,
     lockWorkOrder,
     setCableMode,
     addReelAllocation,
@@ -380,8 +391,9 @@ export default function App() {
           const normalizedAlloc = normalizeRecord(snapshot.payload.allocState);
           const normalizedSelectedWO =
             typeof snapshot.payload.selectedWO === "string" ? snapshot.payload.selectedWO : "";
-          const normalizedTab =
-            snapshot.payload.tab === "accounting" ? "accounting" : "engineering";
+          const normalizedTab = isValidTab(snapshot.payload.tab)
+            ? snapshot.payload.tab
+            : DEFAULT_TAB;
           setRawRows(normalizedRows);
           setMiscEntries(normalizedMisc);
           setWorkOrderNotes(normalizedNotes);
@@ -424,7 +436,7 @@ export default function App() {
     const normalizedAlloc = normalizeRecord(payload.allocState);
     const normalizedSelectedWO =
       typeof payload.selectedWO === "string" ? payload.selectedWO : "";
-    const normalizedTab = payload.tab === "accounting" ? "accounting" : "engineering";
+    const normalizedTab = isValidTab(payload.tab) ? payload.tab : DEFAULT_TAB;
     setRawRows(normalizedRows);
     setMiscEntries(normalizedMisc);
     setWorkOrderNotes(normalizedNotes);
@@ -1039,40 +1051,21 @@ export default function App() {
             </div>
 
             {/* Mode (segmented control) */}
-            <div className="space-y-1" aria-label="Mode">
+            <div className="space-y-1">
               <div className="text-sm text-slate-600">Mode</div>
               <div className="bg-slate-100 rounded-xl p-1">
-                <div className="flex flex-col gap-1">
-                  <button
-                    type="button"
-                    onClick={() => setTab("engineering")}
-                    aria-pressed={tab === "engineering"}
-                    className={[
-                      "w-full px-3 py-2 rounded-lg transition",
-                      "focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-900",
-                      tab === "engineering"
-                        ? "bg-white text-slate-900 font-semibold border border-blue-600 ring-2 ring-blue-600/75"
-                        : "bg-white text-slate-700 hover:bg-white/80 border border-slate-200",
-                    ].join(" ")}
-                  >
-                    Engineer
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setTab("accounting")}
-                    aria-pressed={tab === "accounting"}
-                    className={[
-                      "w-full px-3 py-2 rounded-lg transition",
-                      "focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-900",
-                      tab === "accounting"
-                        ? "bg-white text-slate-900 font-semibold border border-blue-600 ring-2 ring-blue-600/75"
-                        : "bg-white text-slate-700 hover:bg-white/80 border border-slate-200",
-                    ].join(" ")}
-                  >
-                    Accountant
-                  </button>
-                </div>
+                <select
+                  aria-label="Mode selector"
+                  value={tab}
+                  onChange={(event) => setTab(event.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 focus:border-slate-900 focus:outline-none"
+                >
+                  {TAB_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
           </div>
@@ -1093,7 +1086,29 @@ export default function App() {
           )}
         </div>
 
-        {activeWO ? (
+        {tab === "chargeout" ? (
+          <Section
+            title="Material Charge-out"
+            subtitle="Review the spans and journal entries before sending the chargeout to MM"
+            variant="default"
+          >
+            {activeWO ? (
+              <CableReelChargeoutPrototype
+                workOrder={activeWO}
+                grouped={groupedWithMisc}
+                listReels={listReels}
+                listReelSpans={listReelSpans}
+                getReelChargeout={getReelChargeout}
+                setReelChargeout={setReelChargeout}
+                getItemState={getItemState}
+              />
+            ) : (
+              <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-sm text-slate-500">
+                Load a work order to preview its chargeout spans and journal entry matches.
+              </div>
+            )}
+          </Section>
+        ) : activeWO ? (
           <>
             <Section
               title={`Materials for WO ${activeWO}`}

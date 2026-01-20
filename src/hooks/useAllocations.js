@@ -51,6 +51,7 @@ export function useAllocations(grouped) {
     reels: input.reels || {},
     coe: input.coe || {},
     cableMode: input.cableMode || false,
+    chargeouts: input.chargeouts || {},
   });
 
   const getReelSpanMap = (wo, code) => {
@@ -255,6 +256,29 @@ export function useAllocations(grouped) {
     return spans[spans.length - 1];
   };
   const listReels = (wo, code) => Object.keys(getReelSpanMap(wo, code));
+  const getReelChargeout = (wo, code, reelSerial) => {
+    const normalizedSerial = normalizeSerial(reelSerial);
+    if (!normalizedSerial) return {};
+    const k = keyOf(wo, code);
+    const rec = buildReelState(allocState[k] || {});
+    return rec.chargeouts?.[normalizedSerial] || {};
+  };
+  const setReelChargeout = (wo, code, reelSerial, updates) => {
+    const normalizedSerial = normalizeSerial(reelSerial);
+    if (!normalizedSerial || !updates || typeof updates !== "object") return;
+    setAllocState((prev) => {
+      const k = keyOf(wo, code);
+      const cur = buildReelState(prev[k] || {});
+      const nextChargeouts = {
+        ...cur.chargeouts,
+        [normalizedSerial]: {
+          ...cur.chargeouts[normalizedSerial],
+          ...updates,
+        },
+      };
+      return { ...prev, [k]: { ...cur, chargeouts: nextChargeouts } };
+    });
+  };
 
   const setCableMode = (wo, code, enabled) => {
     setAllocState(prev => {
@@ -514,6 +538,8 @@ export function useAllocations(grouped) {
     getReelSpan,
     listReels,
     getReelSpanMap,
+    getReelChargeout,
+    setReelChargeout,
     listReelSpans,
     lockWorkOrder,
     addReelAllocation,
