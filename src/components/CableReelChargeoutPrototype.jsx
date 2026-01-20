@@ -1,12 +1,18 @@
 import { useMemo, useState } from "react";
 
+const CHARGEOUT_STATUS_PENDING = "Pending Charge";
+const CHARGEOUT_STATUS_PENDING_REVIEW = "Pending Review";
+const CHARGEOUT_STATUS_OK_TO_POST = "Ok to Post";
+const CHARGEOUT_STATUS_POSTED = "Posted";
+
 const STATUS_OPTIONS = [
-  "Pending Charge",
-  "Ready for Review",
-  "Pending Review",
-  "Ready to Post",
-  "Ok to Post",
+  CHARGEOUT_STATUS_PENDING,
+  CHARGEOUT_STATUS_PENDING_REVIEW,
+  CHARGEOUT_STATUS_OK_TO_POST,
+  CHARGEOUT_STATUS_POSTED,
 ];
+
+const normalizeChargeoutStatus = (status) => status || CHARGEOUT_STATUS_PENDING;
 
 const formatFootage = (value) => (Number.isFinite(value) ? value.toFixed(2) : "0.00");
 
@@ -23,12 +29,16 @@ export default function CableReelChargeoutPrototype({
   getReelChargeout = () => ({}),
   setReelChargeout = () => {},
   getItemState = () => null,
+  updateAllocation = null,
 }) {
   const [activeStatus, setActiveStatus] = useState(STATUS_OPTIONS[0]);
   const [readyAction, setReadyAction] = useState("Awaiting review");
   const [notes, setNotes] = useState(
     "Cable ready for review once the spans are confirmed in the field.",
   );
+  const [postModalOpen, setPostModalOpen] = useState(false);
+  const [journalEntryInput, setJournalEntryInput] = useState("");
+  const [postError, setPostError] = useState("");
 
   const reelRows = useMemo(() => {
     if (!workOrder || !grouped.has(workOrder)) return [];
@@ -69,33 +79,29 @@ export default function CableReelChargeoutPrototype({
         const chargeoutSpans = reelAllocations
           .map((alloc) => ({
             id: alloc.spanId || alloc.id,
+            allocationId: alloc.id,
             start: alloc.normalized.start,
             end: alloc.normalized.end,
             chargeoutStatus: alloc.chargeoutStatus ?? null,
+            chargeoutJournalEntry: alloc.chargeoutJournalEntry || "",
           }))
           .filter((span) => span.end > span.start);
         if (chargeoutSpans.length === 0) continue;
         const lengthSum = chargeoutSpans.reduce((sum, span) => sum + (span.end - span.start), 0);
-        const outerSeq =
-          Math.min(...chargeoutSpans.map((span) => span.start));
-        const innerSeq =
-          Math.max(...chargeoutSpans.map((span) => span.end));
         const chargeout = getReelChargeout(workOrder, code, reelNumber) || {};
         const chargeoutSpanStatuses = [
           ...new Set(
             chargeoutSpans
-              .map((span) => span.chargeoutStatus)
+              .map((span) => normalizeChargeoutStatus(span.chargeoutStatus))
               .filter((status) => status && status !== ""),
           ),
         ];
         const chargeoutStatusLabel =
-          chargeoutSpanStatuses.length > 0 ? chargeoutSpanStatuses.join(", ") : "Pending";
+          chargeoutSpanStatuses.length > 0 ? chargeoutSpanStatuses.join(", ") : CHARGEOUT_STATUS_PENDING;
         rows.push({
           code,
           description: item?.desc || "",
           reelNumber,
-          outerSeq,
-          innerSeq,
           totalLength: lengthSum,
           spans: chargeoutSpans,
           journalLine: chargeout.journalLine || "",
@@ -108,29 +114,16 @@ export default function CableReelChargeoutPrototype({
     return rows;
   }, [workOrder, grouped, getReelChargeout, getItemState]);
 
-  const totalsByReel = useMemo(() => {
-    const map = {};
-    reelRows.forEach((row) => {
-      map[row.reelNumber] = {
-        quantity: row.totalLength,
-        length: row.totalLength,
-        code: row.code,
-        description: row.description,
-      };
-    });
-    return map;
-  }, [reelRows]);
-
   const aggregateTotals = useMemo(
     () =>
-      Object.values(totalsByReel).reduce(
-        (acc, summary) => ({
-          quantity: acc.quantity + summary.quantity,
-          length: acc.length + summary.length,
+      reelRows.reduce(
+        (acc, row) => ({
+          quantity: acc.quantity + row.totalLength,
+          length: acc.length + row.totalLength,
         }),
         { quantity: 0, length: 0 },
       ),
-    [totalsByReel],
+    [reelRows],
   );
 
   const journalEntries = useMemo(
@@ -144,14 +137,102 @@ export default function CableReelChargeoutPrototype({
     [reelRows],
   );
 
+  const isLocked = activeStatus !== CHARGEOUT_STATUS_PENDING;
+
   const handleChargeoutChange = (row, field) => (event) => {
-    if (!workOrder) return;
+    if (!workOrder || isLocked) return;
     setReelChargeout(workOrder, row.code, row.reelNumber, {
       [field]: event.target.value,
     });
   };
 
+  const postableSpans = useMemo(() => {
+    const spans = [];
+    reelRows.forEach((row) => {
+      row.spans.forEach((span) => {
+        if (normalizeChargeoutStatus(span.chargeoutStatus) === CHARGEOUT_STATUS_OK_TO_POST) {
+          spans.push({ ...span, code: row.code, reelNumber: row.reelNumber });
+        }
+      });
+    });
+    return spans;
+  }, [reelRows]);
+
+  const applyStatusToSpans = (nextStatus) => {
+    if (!workOrder || !updateAllocation) return;
+    reelRows.forEach((row) => {
+      row.spans.forEach((span) => {
+        updateAllocation(workOrder, row.code, span.allocationId, {
+          chargeoutStatus: nextStatus,
+        });
+      });
+    });
+  };
+
+  const handleOpenPostModal = () => {
+    setPostModalOpen(true);
+    setJournalEntryInput("");
+    setPostError("");
+  };
+
+  const handleStatusSelection = (nextStatus) => {
+    if (nextStatus === CHARGEOUT_STATUS_POSTED) {
+      if (postableSpans.length > 0) {
+        handleOpenPostModal();
+        return;
+      }
+      setActiveStatus(nextStatus);
+      applyStatusToSpans(nextStatus);
+      return;
+    }
+    setActiveStatus(nextStatus);
+    applyStatusToSpans(nextStatus);
+  };
+
+  const handleConfirmPost = () => {
+    if (!workOrder || !updateAllocation) return;
+    const trimmed = journalEntryInput.trim();
+    if (!trimmed) {
+      setPostError("Enter a journal entry number.");
+      return;
+    }
+    postableSpans.forEach((span) => {
+      updateAllocation(workOrder, span.code, span.allocationId, {
+        chargeoutStatus: CHARGEOUT_STATUS_POSTED,
+        chargeoutJournalEntry: trimmed,
+      });
+    });
+    setPostModalOpen(false);
+    setJournalEntryInput("");
+    setPostError("");
+    setActiveStatus(CHARGEOUT_STATUS_POSTED);
+  };
+
   const hasReels = reelRows.length > 0;
+  const postableCount = postableSpans.length;
+
+  const getNextBatchLineValue = () => {
+    const values = reelRows
+      .map((row) => String(row.journalLine || "").trim())
+      .filter((value) => /^\d+$/.test(value))
+      .map((value) => Number.parseInt(value, 10))
+      .filter((value) => Number.isFinite(value));
+    if (values.length === 0) return null;
+    return Math.max(...values) + 1;
+  };
+
+  const handleBatchLineFocus = (row) => () => {
+    if (!workOrder || isLocked) return;
+    const currentValue = row.journalLine;
+    if (currentValue !== null && currentValue !== undefined && String(currentValue).trim() !== "") {
+      return;
+    }
+    const nextValue = getNextBatchLineValue();
+    if (!Number.isFinite(nextValue)) return;
+    setReelChargeout(workOrder, row.code, row.reelNumber, {
+      journalLine: String(nextValue),
+    });
+  };
 
   return (
     <div className="space-y-6 text-sm text-slate-700">
@@ -172,7 +253,7 @@ export default function CableReelChargeoutPrototype({
         </div>
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-slate-500">
-            <span>Chargeout Status</span>
+            <span>Charge-out Status</span>
             <span className="text-[11px] font-normal text-slate-400">Updated live</span>
           </div>
           <div className="mt-1 flex flex-wrap gap-2">
@@ -180,7 +261,7 @@ export default function CableReelChargeoutPrototype({
               <button
                 key={option}
                 type="button"
-                onClick={() => setActiveStatus(option)}
+                onClick={() => handleStatusSelection(option)}
                 className={`rounded-2xl px-3 py-1 text-xs font-semibold transition ${
                   option === activeStatus
                     ? "bg-emerald-600 text-white"
@@ -204,7 +285,8 @@ export default function CableReelChargeoutPrototype({
           <button
             type="button"
             onClick={() => setReadyAction((prev) => (prev === "Awaiting review" ? "Ready for Review" : "Awaiting review"))}
-            className="rounded-2xl border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 transition hover:border-slate-300"
+            disabled={isLocked}
+            className="rounded-2xl border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 transition hover:border-slate-300 disabled:cursor-not-allowed disabled:text-slate-400"
           >
             {readyAction}
           </button>
@@ -218,11 +300,9 @@ export default function CableReelChargeoutPrototype({
                   "Item #",
                   "Reel #",
                   "Item Description",
-                  "Inner Seq",
-                  "Outer Seq",
                   "Qty (derived from spans)",
                   "Charge-out status",
-                  "NISC Line #",
+                  "Batch Line #",
                   "Reference",
                 ].map((label) => (
                     <th key={label} className="px-3 py-2 font-normal text-slate-500">
@@ -244,8 +324,6 @@ export default function CableReelChargeoutPrototype({
                       )}
                     </td>
                     <td className="px-3 py-2 text-slate-600">{row.description}</td>
-                    <td className="px-3 py-2 text-slate-600">{row.innerSeq}</td>
-                    <td className="px-3 py-2 text-slate-600">{row.outerSeq}</td>
                     <td className="px-3 py-2 text-slate-600">{formatFootage(row.totalLength)} ft</td>
                     <td className="px-3 py-2 text-slate-600">
                       <span className="inline-flex items-center rounded-full border border-slate-200 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
@@ -257,6 +335,8 @@ export default function CableReelChargeoutPrototype({
                         type="text"
                         value={row.journalLine}
                         onChange={handleChargeoutChange(row, "journalLine")}
+                        onFocus={handleBatchLineFocus(row)}
+                        disabled={isLocked}
                         className="w-24 rounded-xl border border-slate-200 px-2 py-1 text-xs text-slate-700 focus:border-slate-900 focus:ring-0"
                       />
                     </td>
@@ -265,6 +345,7 @@ export default function CableReelChargeoutPrototype({
                         type="text"
                         value={row.reference}
                         onChange={handleChargeoutChange(row, "reference")}
+                        disabled={isLocked}
                         className="w-28 rounded-xl border border-slate-200 px-2 py-1 text-xs text-slate-700 focus:border-slate-900 focus:ring-0"
                       />
                     </td>
@@ -281,7 +362,17 @@ export default function CableReelChargeoutPrototype({
       </div>
 
       <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <h3 className="text-base font-semibold text-slate-900">Cable Spans by Reel</h3>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-base font-semibold text-slate-900">Cable Spans by Reel</h3>
+          <button
+            type="button"
+            onClick={() => handleStatusSelection(CHARGEOUT_STATUS_POSTED)}
+            disabled={!postableCount}
+            className="rounded-2xl border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 transition hover:border-slate-300 disabled:cursor-not-allowed disabled:text-slate-400"
+          >
+            Mark OK to Post as Posted {postableCount ? `(${postableCount})` : ""}
+          </button>
+        </div>
         {hasReels ? (
           reelRows.map((row) => (
             <div key={`spans-${row.reelNumber}`} className="space-y-3 rounded-2xl border border-slate-100 bg-slate-50 p-3">
@@ -293,7 +384,15 @@ export default function CableReelChargeoutPrototype({
                 <table className="min-w-full text-left text-sm">
                   <thead className="bg-slate-100 text-xs uppercase text-slate-500">
                     <tr>
-                      {["Span ID", "From", "To", "Length (ft)", "Quantity", "Comments"].map((label) => (
+                      {[
+                        "Span ID",
+                        "From",
+                        "To",
+                        "Length (ft)",
+                        "Quantity",
+                        "Journal Entry",
+                        "Comments",
+                      ].map((label) => (
                         <th key={`${row.reelNumber}-${label}`} className="px-3 py-2">
                           {label}
                         </th>
@@ -302,25 +401,30 @@ export default function CableReelChargeoutPrototype({
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {row.spans.map((span) => (
-                      <tr key={`${row.reelNumber}-${span.id}`}>
-                        <td className="px-3 py-2 text-slate-700">{span.id}</td>
-                        <td className="px-3 py-2 text-slate-700">{span.start}</td>
-                        <td className="px-3 py-2 text-slate-700">{span.end}</td>
-                        <td className="px-3 py-2 text-slate-700">{formatFootage(span.end - span.start)}</td>
-                        <td className="px-3 py-2 text-slate-700">1</td>
-                        <td className="px-3 py-2">
-                          <div className="flex flex-col gap-1">
-                            <input
-                              type="text"
-                              placeholder="Optional comment"
-                              className="w-full rounded-xl border border-slate-200 px-2 py-1 text-xs text-slate-600 focus:border-slate-900 focus:ring-0"
-                            />
-                            <span className="text-[11px] text-slate-500">
-                              Status: {span.chargeoutStatus || "Pending"}
-                            </span>
-                          </div>
-                        </td>
-                      </tr>
+                        <tr key={`${row.reelNumber}-${span.id}`}>
+                          <td className="px-3 py-2 text-slate-700">{span.id}</td>
+                          <td className="px-3 py-2 text-slate-700">{span.start}</td>
+                          <td className="px-3 py-2 text-slate-700">{span.end}</td>
+                          <td className="px-3 py-2 text-slate-700">{formatFootage(span.end - span.start)}</td>
+                          <td className="px-3 py-2 text-slate-700">1</td>
+                          <td className="px-3 py-2 text-slate-700">
+                            {span.chargeoutJournalEntry
+                              ? span.chargeoutJournalEntry
+                              : activeStatus === CHARGEOUT_STATUS_POSTED
+                                ? "Awaiting JE"
+                                : "—"}
+                          </td>
+                          <td className="px-3 py-2">
+                            <div className="flex flex-col gap-1">
+                              <input
+                                type="text"
+                                placeholder="Optional comment"
+                                disabled={isLocked}
+                                className="w-full rounded-xl border border-slate-200 px-2 py-1 text-xs text-slate-600 focus:border-slate-900 focus:ring-0"
+                              />
+                            </div>
+                          </td>
+                        </tr>
                     ))}
                   </tbody>
                 </table>
@@ -330,23 +434,6 @@ export default function CableReelChargeoutPrototype({
         ) : (
           <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-xs text-slate-500">
             Flag spans in the allocations list to populate the charge-out detail view.
-          </div>
-        )}
-        {hasReels && (
-          <div className="rounded-2xl border border-slate-200 bg-white p-3 text-sm shadow-sm">
-            <div className="flex flex-wrap items-center justify-between gap-3 text-slate-600">
-              <div>
-                <div className="text-xs uppercase tracking-wide text-slate-400">Totals per reel</div>
-                <div className="text-base font-semibold text-slate-900">
-                  {Object.entries(totalsByReel).map(([reelNumber, summary]) => (
-                    <span key={`total-${reelNumber}`} className="mr-4">
-                      {reelNumber}: {formatFootage(summary.quantity)} qty · {formatFootage(summary.length)} ft
-                    </span>
-                  ))}
-                </div>
-              </div>
-              <div className="text-xs text-slate-500">Each reel is billed independently.</div>
-            </div>
           </div>
         )}
       </div>
@@ -360,6 +447,7 @@ export default function CableReelChargeoutPrototype({
           <textarea
             value={notes}
             onChange={(event) => setNotes(event.target.value)}
+            disabled={isLocked}
             className="mt-3 w-full rounded-2xl border border-slate-200 px-3 py-2 text-xs text-slate-700 focus:border-slate-900 focus:ring-0"
           />
           <div className="mt-2 text-xs text-slate-500">Reviewer notes or load-in instructions.</div>
@@ -405,7 +493,7 @@ export default function CableReelChargeoutPrototype({
                     <span className="text-xs font-semibold text-slate-500">{entry.reference}</span>
                   </div>
                   <div className="mt-1 flex items-center justify-between">
-                    <span className="text-sm text-slate-900">Line {entry.line}</span>
+                    <span className="text-sm text-slate-900">Batch line {entry.line}</span>
                     <span className="text-[11px] text-slate-500">{entry.note}</span>
                   </div>
                 </div>
@@ -419,11 +507,56 @@ export default function CableReelChargeoutPrototype({
         </details>
         <button
           type="button"
-          className="w-full rounded-2xl bg-slate-900 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white transition hover:bg-slate-800"
+          disabled={isLocked}
+          className="w-full rounded-2xl bg-slate-900 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
         >
           Save &amp; Send for Chargeout
         </button>
       </div>
+      {postModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+            onClick={() => setPostModalOpen(false)}
+          />
+          <div className="relative z-10 w-full max-w-md rounded-2xl border border-slate-200 bg-white p-4 shadow-xl">
+            <div className="text-sm font-semibold text-slate-900">Post charge-out spans</div>
+            <p className="mt-1 text-xs text-slate-500">
+              Apply a journal entry number to {postableCount} span{postableCount === 1 ? "" : "s"} marked Ok to Post.
+            </p>
+            <label className="mt-3 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Journal Entry Number
+            </label>
+            <input
+              type="text"
+              value={journalEntryInput}
+              onChange={(event) => {
+                setJournalEntryInput(event.target.value);
+                if (postError) setPostError("");
+              }}
+              className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-slate-900 focus:ring-0"
+              placeholder="e.g., JE-104392"
+            />
+            {postError && <div className="mt-2 text-xs text-red-600">{postError}</div>}
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setPostModalOpen(false)}
+                className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:border-slate-300"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmPost}
+                className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-white transition hover:bg-slate-800"
+              >
+                Post spans
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

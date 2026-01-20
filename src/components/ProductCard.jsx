@@ -21,6 +21,13 @@ const CHARGEOUT_ELIGIBLE_CATEGORIES = new Set([
   "underground",
   "expense",
 ]);
+const DEFAULT_CHARGEOUT_STATUS = "Pending Charge";
+const CHARGEOUT_STATUS_HELPER = {
+  "Pending Charge": "Awaiting processing by Material Management",
+  "Pending Review": "Material Management has begun the charge-out process",
+  "Ok to Post": "The charge-out has been entered and reviewed. Awaiting final step.",
+  Posted: "Charge-out process completed",
+};
 
 export default function ProductCard({
   wo, product, getItemState,
@@ -199,12 +206,26 @@ export default function ProductCard({
     if (!updateAllocation) return;
     const eligible = getEligibleAllocationsForSpan(serial, span);
     eligible.forEach((allocation) => {
-      updateAllocation(wo, product.code, allocation.id, { chargeoutSelected: !!visible });
+      const nextFields = { chargeoutSelected: !!visible };
+      if (visible) {
+        nextFields.chargeoutStatus = allocation.chargeoutStatus || DEFAULT_CHARGEOUT_STATUS;
+      } else {
+        nextFields.chargeoutStatus = null;
+        nextFields.chargeoutJournalEntry = "";
+      }
+      updateAllocation(wo, product.code, allocation.id, nextFields);
     });
   };
   const handleAllocationChargeoutToggle = (allocation, visible) => {
     if (!updateAllocation) return;
-    updateAllocation(wo, product.code, allocation.id, { chargeoutSelected: !!visible });
+    const nextFields = { chargeoutSelected: !!visible };
+    if (visible) {
+      nextFields.chargeoutStatus = allocation.chargeoutStatus || DEFAULT_CHARGEOUT_STATUS;
+    } else {
+      nextFields.chargeoutStatus = null;
+      nextFields.chargeoutJournalEntry = "";
+    }
+    updateAllocation(wo, product.code, allocation.id, nextFields);
   };
   const fallbackSpan = reelSerial ? getReelSpan(wo, product.code, reelSerial) : null;
   const activeSpan = selectedSpanId
@@ -1264,6 +1285,11 @@ export default function ProductCard({
                     : "border-slate-200 bg-white text-slate-600";
                 const isChargeoutEligible = isChargeoutEligibleAllocation(a);
                 const isAllocationChargeoutChecked = !!a.chargeoutSelected;
+                const chargeoutStatusLabel = isAllocationChargeoutChecked
+                  ? a.chargeoutStatus || DEFAULT_CHARGEOUT_STATUS
+                  : "";
+                const chargeoutJournalEntry = a.chargeoutJournalEntry || "";
+                const chargeoutStatusHelper = CHARGEOUT_STATUS_HELPER[chargeoutStatusLabel] || "";
                 const cardColor = isPendingReturn
                     ? "border-yellow-200 bg-yellow-50 text-yellow-800"
                     : isReturned
@@ -1370,6 +1396,23 @@ export default function ProductCard({
                             />
                             Flag spans for charge-out
                           </label>
+                        </div>
+                      )}
+                      {a.type === "reel" && isChargeoutEligible && isAllocationChargeoutChecked && (
+                        <div className="flex flex-wrap gap-2 mt-2 text-[11px]">
+                          <span className={`${chipBase} ${chipColor} relative group`}>
+                            Charge-out status: <b>{chargeoutStatusLabel}</b>
+                            {chargeoutStatusHelper && (
+                              <span className="pointer-events-none absolute left-1/2 -top-7 -translate-x-1/2 rounded-full bg-slate-900 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white opacity-0 transition-opacity group-hover:opacity-100">
+                                {chargeoutStatusHelper}
+                              </span>
+                            )}
+                          </span>
+                          {chargeoutJournalEntry && (
+                            <span className={`${chipBase} ${chipColor}`}>
+                              JE #: <b>{chargeoutJournalEntry}</b>
+                            </span>
+                          )}
                         </div>
                       )}
                       {a.allocationId && (

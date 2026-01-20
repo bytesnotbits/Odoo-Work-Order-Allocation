@@ -309,9 +309,53 @@ export default function App() {
     (wo, code, allocId, payload) => {
       updateAllocation(wo, code, allocId, payload);
       if (!wo || !allocId) return;
-      logAuditEvent(wo, "Updated allocation", `Allocation ${allocId} updated`);
+      if (!payload || typeof payload !== "object") {
+        logAuditEvent(wo, "Updated allocation", `Allocation ${allocId} updated`);
+        return;
+      }
+      const prevAlloc =
+        allocState?.[`${wo}|${code}`]?.allocations?.find((alloc) => alloc.id === allocId) || null;
+      const hasStatusChange =
+        Object.prototype.hasOwnProperty.call(payload, "chargeoutStatus") &&
+        payload.chargeoutStatus !== prevAlloc?.chargeoutStatus;
+      const prevJournalEntry = prevAlloc?.chargeoutJournalEntry || "";
+      const hasJournalEntryChange =
+        Object.prototype.hasOwnProperty.call(payload, "chargeoutJournalEntry") &&
+        payload.chargeoutJournalEntry !== prevJournalEntry;
+      const hasChargeoutFlagChange =
+        Object.prototype.hasOwnProperty.call(payload, "chargeoutSelected") &&
+        payload.chargeoutSelected !== prevAlloc?.chargeoutSelected;
+      const allocationLabel = prevAlloc
+        ? describeAllocationPayload(wo, code, prevAlloc)
+        : `Allocation ${allocId}`;
+      if (hasStatusChange) {
+        const prevStatus = prevAlloc?.chargeoutStatus || (prevAlloc?.chargeoutSelected ? "Pending Charge" : "None");
+        const nextStatus = payload.chargeoutStatus || (payload.chargeoutSelected ? "Pending Charge" : "None");
+        const journalSuffix =
+          hasJournalEntryChange && payload.chargeoutJournalEntry
+            ? ` · JE ${payload.chargeoutJournalEntry}`
+            : "";
+        logAuditEvent(
+          wo,
+          "Charge-out status updated",
+          `${allocationLabel} — ${prevStatus} → ${nextStatus}${journalSuffix}`,
+        );
+      }
+      if (hasJournalEntryChange && !hasStatusChange) {
+        const journalLabel = payload.chargeoutJournalEntry
+          ? `JE ${payload.chargeoutJournalEntry}`
+          : "JE cleared";
+        logAuditEvent(wo, "Charge-out journal entry updated", `${allocationLabel} — ${journalLabel}`);
+      }
+      if (hasChargeoutFlagChange && !hasStatusChange) {
+        const flagLabel = payload.chargeoutSelected ? "Flagged for charge-out" : "Charge-out flag cleared";
+        logAuditEvent(wo, "Charge-out flag updated", `${allocationLabel} — ${flagLabel}`);
+      }
+      if (!hasStatusChange && !hasJournalEntryChange && !hasChargeoutFlagChange) {
+        logAuditEvent(wo, "Updated allocation", `Allocation ${allocId} updated`);
+      }
     },
-    [updateAllocation, logAuditEvent],
+    [updateAllocation, logAuditEvent, allocState, describeAllocationPayload],
   );
 
   const handleRemoveAllocation = useCallback(
@@ -1101,6 +1145,7 @@ export default function App() {
                 getReelChargeout={getReelChargeout}
                 setReelChargeout={setReelChargeout}
                 getItemState={getItemState}
+                updateAllocation={handleUpdateAllocation}
               />
             ) : (
               <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-sm text-slate-500">

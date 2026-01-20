@@ -49,6 +49,10 @@ The chargeout experience should present a landscape-formatted “Cable Reel Char
 
 Each line in the form should accept input fields matching what the user types into the NISC chargeout screen (journal line numbers, reference, comments, etc.) so the Material Management Team can immediately note what they charged and make the reviewer’s reconciliation straightforward. The form should remain entirely digital—no printing—and should include signature/approval inputs for the engineer and material management verifier plus a timestamp and reminder that the material is not charged until the form is completed and verified. This would allow reviewers to match each chargeout form line with the corresponding journal entry line without switching contexts.
 
+#### Charge-out multiple work orders
+Material Management will need, at times, to create entries for more than one work order at a time. Can we make the charge-out form less about a specific work order, and more about the reel spans that have been flagged to be charged-out?
+I'm thinking a filter on the charge-out form that would allow the user to see and filter all work orders with material ready to be charged-out.
+
 ### Real-time updates
 Users should be able to see all updates made by anyone in real-time.
 - As the engineers update their allocations
