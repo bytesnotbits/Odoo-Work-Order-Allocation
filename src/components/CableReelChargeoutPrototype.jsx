@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 const CHARGEOUT_STATUS_PENDING = "Pending Charge";
 const CHARGEOUT_STATUS_PENDING_REVIEW = "Pending Review";
@@ -13,6 +13,12 @@ const STATUS_OPTIONS = [
 ];
 
 const normalizeChargeoutStatus = (status) => status || CHARGEOUT_STATUS_PENDING;
+const STATUS_PRIORITY = {
+  [CHARGEOUT_STATUS_PENDING]: 0,
+  [CHARGEOUT_STATUS_PENDING_REVIEW]: 1,
+  [CHARGEOUT_STATUS_OK_TO_POST]: 2,
+  [CHARGEOUT_STATUS_POSTED]: 3,
+};
 
 const formatFootage = (value) => (Number.isFinite(value) ? value.toFixed(2) : "0.00");
 
@@ -32,6 +38,7 @@ export default function CableReelChargeoutPrototype({
   updateAllocation = null,
 }) {
   const [activeStatus, setActiveStatus] = useState(STATUS_OPTIONS[0]);
+  const statusTouchedRef = useRef(false);
   const [readyAction, setReadyAction] = useState("Awaiting review");
   const [notes, setNotes] = useState(
     "Cable ready for review once the spans are confirmed in the field.",
@@ -114,6 +121,35 @@ export default function CableReelChargeoutPrototype({
     return rows;
   }, [workOrder, grouped, getReelChargeout, getItemState]);
 
+  const derivedStatus = useMemo(() => {
+    if (reelRows.length === 0) return CHARGEOUT_STATUS_PENDING;
+    const statusSet = new Set();
+    reelRows.forEach((row) => {
+      row.spans.forEach((span) => {
+        statusSet.add(normalizeChargeoutStatus(span.chargeoutStatus));
+      });
+    });
+    if (statusSet.size === 0) return CHARGEOUT_STATUS_PENDING;
+    let highest = CHARGEOUT_STATUS_PENDING;
+    statusSet.forEach((status) => {
+      const rank = STATUS_PRIORITY[status] ?? -1;
+      const currentRank = STATUS_PRIORITY[highest] ?? -1;
+      if (rank > currentRank) highest = status;
+    });
+    return highest;
+  }, [reelRows]);
+
+  useEffect(() => {
+    statusTouchedRef.current = false;
+  }, [workOrder]);
+
+  useEffect(() => {
+    if (statusTouchedRef.current) return;
+    if (derivedStatus !== activeStatus) {
+      setActiveStatus(derivedStatus);
+    }
+  }, [derivedStatus, activeStatus]);
+
   const aggregateTotals = useMemo(
     () =>
       reelRows.reduce(
@@ -181,10 +217,12 @@ export default function CableReelChargeoutPrototype({
         handleOpenPostModal();
         return;
       }
+      statusTouchedRef.current = true;
       setActiveStatus(nextStatus);
       applyStatusToSpans(nextStatus);
       return;
     }
+    statusTouchedRef.current = true;
     setActiveStatus(nextStatus);
     applyStatusToSpans(nextStatus);
   };
@@ -205,6 +243,7 @@ export default function CableReelChargeoutPrototype({
     setPostModalOpen(false);
     setJournalEntryInput("");
     setPostError("");
+    statusTouchedRef.current = true;
     setActiveStatus(CHARGEOUT_STATUS_POSTED);
   };
 
