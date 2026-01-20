@@ -18,6 +18,8 @@ export function useAllocations(grouped) {
       id: span?.id || span?.spanId || uid(),
       start: bounds.start,
       end: bounds.end,
+      showOnChargeout: !!span?.showOnChargeout,
+      chargeoutStatus: span?.chargeoutStatus ?? null,
     };
   };
 
@@ -195,12 +197,25 @@ export function useAllocations(grouped) {
     const bounds = normalizeReelBounds(start, end);
     if (!bounds) return null;
     const spanId = options.spanId || uid();
-    const newSpan = { id: spanId, start: bounds.start, end: bounds.end };
-    setAllocState(prev => {
+    let createdSpan = null;
+    setAllocState((prev) => {
       const k = keyOf(wo, code);
       const cur = buildReelState(prev[k] || {});
       const normalized = normalizeReelSpanRecords(cur.reels);
       const existing = normalized[normalizedSerial] || [];
+      const existingSpan = options.spanId ? existing.find((span) => span.id === spanId) : null;
+      const newSpan = {
+        id: spanId,
+        start: bounds.start,
+        end: bounds.end,
+        showOnChargeout:
+          typeof options.showOnChargeout === "boolean"
+            ? options.showOnChargeout
+            : existingSpan?.showOnChargeout || false,
+        chargeoutStatus:
+          options.chargeoutStatus ?? existingSpan?.chargeoutStatus ?? null,
+      };
+      createdSpan = newSpan;
       const updated = options.spanId
         ? existing.map((span) => (span.id === spanId ? newSpan : span))
         : [...existing, newSpan];
@@ -215,7 +230,7 @@ export function useAllocations(grouped) {
         },
       };
     });
-    return newSpan;
+    return createdSpan;
   };
   const removeReelSpan = (wo, code, reelSerial) => {
     const normalizedSerial = normalizeSerial(reelSerial);
@@ -246,6 +261,35 @@ export function useAllocations(grouped) {
       return { ...prev, [k]: { ...cur, reels: updated } };
     });
   };
+  const updateReelSpan = (wo, code, reelSerial, spanId, updates = {}) => {
+    const normalizedSerial = normalizeSerial(reelSerial);
+    if (!normalizedSerial || !spanId) return;
+    setAllocState((prev) => {
+      const k = keyOf(wo, code);
+      const cur = buildReelState(prev[k] || {});
+      const normalized = normalizeReelSpanRecords(cur.reels);
+      const existing = normalized[normalizedSerial] || [];
+      let found = false;
+      const updated = existing.map((span) => {
+        if (span.id !== spanId) return span;
+        found = true;
+        return { ...span, ...updates };
+      });
+      if (!found) return prev;
+      return {
+        ...prev,
+        [k]: {
+          ...cur,
+          reels: {
+            ...normalized,
+            [normalizedSerial]: updated,
+          },
+        },
+      };
+    });
+  };
+  const setSpanChargeoutVisibility = (wo, code, reelSerial, spanId, visible) =>
+    updateReelSpan(wo, code, reelSerial, spanId, { showOnChargeout: !!visible });
   const getReelSpan = (wo, code, reelSerial, spanId) => {
     const spans = listReelSpans(wo, code, reelSerial);
     if (!spans.length) return { start: "", end: "" };
@@ -545,5 +589,7 @@ export function useAllocations(grouped) {
     addReelAllocation,
     updateAllocation,
     removeReelSpanEntry,
+    updateReelSpan,
+    setSpanChargeoutVisibility,
   };
 }

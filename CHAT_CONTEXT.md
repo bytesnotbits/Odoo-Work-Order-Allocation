@@ -10,6 +10,7 @@ These points are for any new chat window tackling this project; opening `CHAT_CO
 - `src/App.jsx` orchestrates uploads, allocations, misc entries, notes, persistence (IndexedDB/localStorage), and exports; read this file next for core behavior.
 - `src/components/Section`, `Badge`, and `WOView` render the UI blocks you’ll interact with, while `src/hooks/useAllocations` houses the allocation state helpers.
 - Supporting utilities live in `src/lib/rows.js`, `src/lib/data.js`, and `src/lib/xlsxExport.js`, and general helpers live under `src/utils/*`.
+- Added a `chargeout` mode alongside engineering/accounting so a dedicated Material Charge-out section hosts the Reel Chargeout prototype; see the tab selector in `src/App.jsx` for the new dropdown and routing logic.
 
 ## Useful commands
 - `npm run dev` → launch the Vite dev server.

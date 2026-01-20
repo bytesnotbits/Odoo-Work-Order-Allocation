@@ -20,8 +20,6 @@ const ALLOWED_CHARGEOUT_CATEGORIES = new Set([
 export default function CableReelChargeoutPrototype({
   workOrder,
   grouped = new Map(),
-  listReels = () => [],
-  listReelSpans = () => [],
   getReelChargeout = () => ({}),
   setReelChargeout = () => {},
   getItemState = () => null,
@@ -37,59 +35,61 @@ export default function CableReelChargeoutPrototype({
     const rows = [];
     const products = grouped.get(workOrder) || new Map();
     for (const [code, item] of products.entries()) {
-      const reels = listReels(workOrder, code) || [];
-      reels.forEach((reelNumber) => {
-        const spans = listReelSpans(workOrder, code, reelNumber);
-        const boundedSpans = spans.filter(
-          (span) => span?.start != null && span?.end != null && span.end > span.start,
-        );
-        const state = getItemState(workOrder, code);
-        const allocations = state?.extra?.allocations || [];
-        const matchingAllocations = allocations
-          .filter(
-            (alloc) =>
-              alloc?.type === "reel" &&
-              ALLOWED_CHARGEOUT_CATEGORIES.has(
-                String(alloc.allocationCategory || "").trim().toLowerCase(),
-              ),
-          )
-          .map((alloc) => {
-            const start = Number(alloc.start ?? alloc.inner ?? alloc.outer);
-            const end = Number(alloc.end ?? alloc.outer ?? alloc.inner);
-            if (!Number.isFinite(start) || !Number.isFinite(end)) return alloc.spanId ? { id: alloc.spanId } : null;
-            const normalized = start <= end ? { start, end } : { start: end, end: start };
-            return {
-              ...alloc,
-              spanId: alloc.spanId,
-              normalized,
-            };
-          })
-          .filter(Boolean);
-        const allowedSpanIds = new Set(matchingAllocations.map((alloc) => alloc.spanId).filter(Boolean));
-        const allowedRanges = new Set(
-          matchingAllocations
-            .map((alloc) => alloc.normalized)
-            .filter(Boolean)
-            .map((range) => `${range.start}:${range.end}`),
-        );
-        const matchesRange = (span) => {
-          const key = `${span.start}:${span.end}`;
-          return allowedRanges.has(key);
-        };
-        const chargeoutSpans = boundedSpans.filter(
-          (span) => allowedSpanIds.has(span.id) || matchesRange(span),
-        );
-        if (chargeoutSpans.length === 0) return;
+      const state = getItemState(workOrder, code);
+      const allocations = state?.extra?.allocations || [];
+      const flaggedAllocations = allocations
+        .filter(
+          (alloc) =>
+            alloc?.type === "reel" &&
+            alloc.chargeoutSelected &&
+            ALLOWED_CHARGEOUT_CATEGORIES.has(
+              String(alloc.allocationCategory || "").trim().toLowerCase(),
+            ),
+        )
+        .map((alloc) => {
+          const start = Number(alloc.start ?? alloc.inner ?? alloc.outer);
+          const end = Number(alloc.end ?? alloc.outer ?? alloc.inner);
+          if (!Number.isFinite(start) || !Number.isFinite(end)) return null;
+          const normalized = start <= end ? { start, end } : { start: end, end: start };
+          return {
+            ...alloc,
+            normalized,
+          };
+        })
+        .filter(Boolean);
+      const allocationsByReel = new Map();
+      flaggedAllocations.forEach((alloc) => {
+        const reelNumber = String(alloc.reelSerial || "").trim();
+        if (!reelNumber) return;
+        const list = allocationsByReel.get(reelNumber) || [];
+        list.push(alloc);
+        allocationsByReel.set(reelNumber, list);
+      });
+      for (const [reelNumber, reelAllocations] of allocationsByReel.entries()) {
+        const chargeoutSpans = reelAllocations
+          .map((alloc) => ({
+            id: alloc.spanId || alloc.id,
+            start: alloc.normalized.start,
+            end: alloc.normalized.end,
+            chargeoutStatus: alloc.chargeoutStatus ?? null,
+          }))
+          .filter((span) => span.end > span.start);
+        if (chargeoutSpans.length === 0) continue;
         const lengthSum = chargeoutSpans.reduce((sum, span) => sum + (span.end - span.start), 0);
         const outerSeq =
-          chargeoutSpans.length > 0
-            ? Math.min(...chargeoutSpans.map((span) => span.start))
-            : "";
+          Math.min(...chargeoutSpans.map((span) => span.start));
         const innerSeq =
-          chargeoutSpans.length > 0
-            ? Math.max(...chargeoutSpans.map((span) => span.end))
-            : "";
+          Math.max(...chargeoutSpans.map((span) => span.end));
         const chargeout = getReelChargeout(workOrder, code, reelNumber) || {};
+        const chargeoutSpanStatuses = [
+          ...new Set(
+            chargeoutSpans
+              .map((span) => span.chargeoutStatus)
+              .filter((status) => status && status !== ""),
+          ),
+        ];
+        const chargeoutStatusLabel =
+          chargeoutSpanStatuses.length > 0 ? chargeoutSpanStatuses.join(", ") : "Pending";
         rows.push({
           code,
           description: item?.desc || "",
@@ -101,11 +101,12 @@ export default function CableReelChargeoutPrototype({
           journalLine: chargeout.journalLine || "",
           reference: chargeout.reference || "",
           submitted: !!chargeout.submitted,
+          chargeoutStatus: chargeoutStatusLabel,
         });
-      });
+      }
     }
     return rows;
-  }, [workOrder, grouped, listReels, listReelSpans, getReelChargeout, getItemState]);
+  }, [workOrder, grouped, getReelChargeout, getItemState]);
 
   const totalsByReel = useMemo(() => {
     const map = {};
@@ -213,16 +214,17 @@ export default function CableReelChargeoutPrototype({
             <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
               <thead className="bg-slate-50">
                 <tr>
-                  {[
-                    "Item #",
-                    "Reel #",
-                    "Item Description",
-                    "Inner Seq",
-                    "Outer Seq",
-                    "Qty (derived from spans)",
-                    "NISC Line #",
-                    "Reference",
-                  ].map((label) => (
+                {[
+                  "Item #",
+                  "Reel #",
+                  "Item Description",
+                  "Inner Seq",
+                  "Outer Seq",
+                  "Qty (derived from spans)",
+                  "Charge-out status",
+                  "NISC Line #",
+                  "Reference",
+                ].map((label) => (
                     <th key={label} className="px-3 py-2 font-normal text-slate-500">
                       {label}
                     </th>
@@ -246,6 +248,11 @@ export default function CableReelChargeoutPrototype({
                     <td className="px-3 py-2 text-slate-600">{row.outerSeq}</td>
                     <td className="px-3 py-2 text-slate-600">{formatFootage(row.totalLength)} ft</td>
                     <td className="px-3 py-2 text-slate-600">
+                      <span className="inline-flex items-center rounded-full border border-slate-200 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
+                        {row.chargeoutStatus}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 text-slate-600">
                       <input
                         type="text"
                         value={row.journalLine}
@@ -268,7 +275,7 @@ export default function CableReelChargeoutPrototype({
           </div>
         ) : (
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-500">
-            No reel spans have been captured yet. Create spans in the allocation form so this view can pull from them.
+            No charge-out spans flagged yet. Use the allocation table to flag eligible spans for charge-out.
           </div>
         )}
       </div>
@@ -302,11 +309,16 @@ export default function CableReelChargeoutPrototype({
                         <td className="px-3 py-2 text-slate-700">{formatFootage(span.end - span.start)}</td>
                         <td className="px-3 py-2 text-slate-700">1</td>
                         <td className="px-3 py-2">
-                          <input
-                            type="text"
-                            placeholder="Optional comment"
-                            className="w-full rounded-xl border border-slate-200 px-2 py-1 text-xs text-slate-600 focus:border-slate-900 focus:ring-0"
-                          />
+                          <div className="flex flex-col gap-1">
+                            <input
+                              type="text"
+                              placeholder="Optional comment"
+                              className="w-full rounded-xl border border-slate-200 px-2 py-1 text-xs text-slate-600 focus:border-slate-900 focus:ring-0"
+                            />
+                            <span className="text-[11px] text-slate-500">
+                              Status: {span.chargeoutStatus || "Pending"}
+                            </span>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -317,7 +329,7 @@ export default function CableReelChargeoutPrototype({
           ))
         ) : (
           <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-xs text-slate-500">
-            Spans are the single source of truth for reel geometry. Allocate spans in the engineering view before charging.
+            Flag spans in the allocations list to populate the charge-out detail view.
           </div>
         )}
         {hasReels && (

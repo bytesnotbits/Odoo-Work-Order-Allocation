@@ -15,6 +15,12 @@ const DEFAULT_PENDING_CATEGORY =
 const SYNTHETIC_PLACEHOLDER_CATEGORY = "PLACEHOLDER";
 
 const ASSET_META_SUPPRESSED_CATEGORIES = new Set(["pending", "returned", "expense"]);
+const CHARGEOUT_ELIGIBLE_CATEGORIES = new Set([
+  "aerial",
+  "buried",
+  "underground",
+  "expense",
+]);
 
 export default function ProductCard({
   wo, product, getItemState,
@@ -168,6 +174,38 @@ export default function ProductCard({
   const reelFootage = Math.abs((Number(inner) || 0) - (Number(outer) || 0));
   const reelSpanMap = getReelSpanMap(wo, product.code);
   const knownReels = listReels(wo, product.code);
+  const isChargeoutEligibleAllocation = (allocation) => {
+    if (allocation?.type !== "reel") return false;
+    const categoryKey = String(allocation.allocationCategory || "").trim().toLowerCase();
+    return CHARGEOUT_ELIGIBLE_CATEGORIES.has(categoryKey);
+  };
+  const getEligibleAllocationsForSpan = (serial, span) => {
+    const serialKey = normalizeSerialKey(serial);
+    if (!serialKey || !span) return [];
+    const spanStart = Number(span.start);
+    const spanEnd = Number(span.end);
+    if (!Number.isFinite(spanStart) || !Number.isFinite(spanEnd) || spanEnd <= spanStart) return [];
+    const spanMin = Math.min(spanStart, spanEnd);
+    const spanMax = Math.max(spanStart, spanEnd);
+    return (extra.allocations || []).filter((allocation) => {
+      if (!isChargeoutEligibleAllocation(allocation)) return false;
+      if (normalizeSerialKey(allocation.reelSerial) !== serialKey) return false;
+      const bounds = normalizeReelBounds(allocation.outer, allocation.inner);
+      if (!bounds) return false;
+      return bounds.start >= spanMin && bounds.end <= spanMax;
+    });
+  };
+  const handleSpanChargeoutToggle = (serial, span, visible) => {
+    if (!updateAllocation) return;
+    const eligible = getEligibleAllocationsForSpan(serial, span);
+    eligible.forEach((allocation) => {
+      updateAllocation(wo, product.code, allocation.id, { chargeoutSelected: !!visible });
+    });
+  };
+  const handleAllocationChargeoutToggle = (allocation, visible) => {
+    if (!updateAllocation) return;
+    updateAllocation(wo, product.code, allocation.id, { chargeoutSelected: !!visible });
+  };
   const fallbackSpan = reelSerial ? getReelSpan(wo, product.code, reelSerial) : null;
   const activeSpan = selectedSpanId
     ? getReelSpan(wo, product.code, reelSerial, selectedSpanId)
@@ -886,24 +924,45 @@ export default function ProductCard({
                                 <div className="flex flex-1 min-w-0 gap-2 overflow-x-auto whitespace-nowrap">
                                   {spans.length > 0 &&
                                     spans.map((span) => {
-                                      const isActiveSpan =
-                                        span.id === selectedSpanId;
+                                      const isActiveSpan = span.id === selectedSpanId;
+                                      const eligibleAllocations = getEligibleAllocationsForSpan(serial, span);
+                                      const isSpanChargeoutChecked =
+                                        eligibleAllocations.length > 0 &&
+                                        eligibleAllocations.every((allocation) => allocation.chargeoutSelected);
+                                      const chargeoutToggleId = `chargeout-${serial}-${span.id}`;
                                       return (
-                                        <button
-                                          type="button"
-                                          key={span.id}
-                                          className={[
-                                            "px-2 py-1 rounded-full border text-[11px] transition whitespace-nowrap text-center min-w-[84px]",
-                                            isActiveSpan
-                                              ? "bg-slate-900 text-white border-slate-900"
-                                              : "bg-white text-slate-900 border-slate-200 hover:bg-slate-50"
-                                          ].join(" ")}
-                                          onClick={() =>
-                                            handleSelectSpan(serial, span)
-                                          }
-                                        >
-                                          [{span.start}–{span.end}]
-                                        </button>
+                                        <div key={span.id} className="flex items-center gap-2">
+                                          <button
+                                            type="button"
+                                            className={[
+                                              "px-2 py-1 rounded-full border text-[11px] transition whitespace-nowrap text-center min-w-[84px]",
+                                              isActiveSpan
+                                                ? "bg-slate-900 text-white border-slate-900"
+                                                : "bg-white text-slate-900 border-slate-200 hover:bg-slate-50"
+                                            ].join(" ")}
+                                            onClick={() => handleSelectSpan(serial, span)}
+                                          >
+                                            [{span.start}–{span.end}]
+                                          </button>
+                                          <label htmlFor={chargeoutToggleId} className="flex items-center gap-1 text-[11px] text-slate-500">
+                                            <input
+                                              type="checkbox"
+                                              id={chargeoutToggleId}
+                                              checked={isSpanChargeoutChecked}
+                                              onChange={(event) =>
+                                                handleSpanChargeoutToggle(serial, span, event.target.checked)
+                                              }
+                                              disabled={eligibleAllocations.length === 0}
+                                              className="h-3 w-3 rounded border-slate-300 text-slate-900 focus:ring-slate-500"
+                                            />
+                                            Charge-out
+                                          </label>
+                                          {eligibleAllocations.length === 0 && (
+                                            <span className="text-[11px] text-slate-400 italic">
+                                              No qualifying allocations on this span
+                                            </span>
+                                          )}
+                                        </div>
                                       );
                                     })}
                                 </div>
@@ -1203,6 +1262,8 @@ export default function ProductCard({
                   : isReturned
                     ? "border-slate-200 bg-white text-slate-400"
                     : "border-slate-200 bg-white text-slate-600";
+                const isChargeoutEligible = isChargeoutEligibleAllocation(a);
+                const isAllocationChargeoutChecked = !!a.chargeoutSelected;
                 const cardColor = isPendingReturn
                     ? "border-yellow-200 bg-yellow-50 text-yellow-800"
                     : isReturned
@@ -1295,6 +1356,22 @@ export default function ProductCard({
                           Category: <b>{a.allocationCategory || "Uncategorized"}</b>
                         </span>
                       </div>
+                      {a.type === "reel" && isChargeoutEligible && !isPendingReturn && (
+                        <div className="flex flex-wrap items-center gap-3 mt-2 text-[11px]">
+                          <label className="flex items-center gap-1 text-slate-600">
+                            <input
+                              type="checkbox"
+                              checked={isAllocationChargeoutChecked}
+                              onChange={(event) =>
+                                handleAllocationChargeoutToggle(a, event.target.checked)
+                              }
+                              onClick={(event) => event.stopPropagation()}
+                              className="h-3 w-3 rounded border-slate-300 text-slate-900 focus:ring-slate-500"
+                            />
+                            Flag spans for charge-out
+                          </label>
+                        </div>
+                      )}
                       {a.allocationId && (
                         <div className="flex flex-wrap gap-2 mt-2 text-[11px]">
                           <span className={`${chipBase} ${chipColor}`}>

@@ -53,3 +53,6 @@ Each line in the form should accept input fields matching what the user types in
 Users should be able to see all updates made by anyone in real-time.
 - As the engineers update their allocations
 - When Material Management
+
+### Data integrity detection
+- Implement a way to avoid stale data from being imported as current data. There could be instances when a work order is imported and worked on by an engineer or other party. Maybe even accounting transactions have taken place. We need a way to keep the original, now stale data from being imported as actual and creating conflicts.
