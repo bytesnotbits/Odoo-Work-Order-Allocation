@@ -11,6 +11,34 @@ export function useAllocations(grouped) {
 
   const normalizeSerial = (value) => String(value || "").trim();
 
+  const TEXT_FIELDS_TO_UPPERCASE = [
+    "allocationId",
+    "allocationCategory",
+    "reelSerial",
+    "chargeoutJournalEntry",
+  ];
+
+  const uppercaseTextValue = (value) => (typeof value === "string" ? value.toUpperCase() : value);
+
+  const uppercaseAllocationTextFields = (source) => {
+    if (!source || typeof source !== "object") return source;
+    const normalized = { ...source };
+    for (const key of TEXT_FIELDS_TO_UPPERCASE) {
+      if (!Object.prototype.hasOwnProperty.call(source, key)) continue;
+      normalized[key] = uppercaseTextValue(source[key]);
+    }
+    return normalized;
+  };
+
+  const uppercaseAssetMeta = (meta) => {
+    if (!meta || typeof meta !== "object") return {};
+    const normalized = {};
+    for (const [key, value] of Object.entries(meta)) {
+      normalized[key] = uppercaseTextValue(value);
+    }
+    return normalized;
+  };
+
   const normalizeReelSpan = (span) => {
     const bounds = normalizeReelBounds(span?.start ?? span?.outer, span?.end ?? span?.inner);
     if (!bounds) return null;
@@ -139,7 +167,8 @@ export function useAllocations(grouped) {
   };
 
   const upsertAllocation = (wo, code, alloc, assetMeta = null) => {
-    const newAlloc = { id: uid(), ...alloc };
+    const safeAlloc = uppercaseAllocationTextFields(alloc);
+    const newAlloc = { id: uid(), ...safeAlloc };
     setAllocState(prev => {
       const k = keyOf(wo, code);
       const cur = buildReelState(prev[k] || {});
@@ -148,7 +177,10 @@ export function useAllocations(grouped) {
         const previousMeta = typeof updatedAssets[newAlloc.id] === "object"
           ? updatedAssets[newAlloc.id]
           : { assetId: "", coeLoc: "", rackBay: "", sepcat: "" };
-        updatedAssets[newAlloc.id] = { ...previousMeta, ...assetMeta };
+        updatedAssets[newAlloc.id] = {
+          ...previousMeta,
+          ...uppercaseAssetMeta(assetMeta),
+        };
       }
       return { ...prev, [k]: { ...cur, allocations: [...cur.allocations, newAlloc], assets: updatedAssets } };
     });
@@ -170,9 +202,10 @@ export function useAllocations(grouped) {
       const k = keyOf(wo, code);
       const cur = buildReelState(prev[k] || {});
       const prevMeta = cur.assets?.[allocId];
+      const normalizedAssetId = uppercaseTextValue(assetId);
       const meta = typeof prevMeta === 'object'
-        ? { ...prevMeta, assetId }
-        : { assetId, coeLoc: '', rackBay: '', sepcat: '' };
+        ? { ...prevMeta, assetId: normalizedAssetId }
+        : { assetId: normalizedAssetId, coeLoc: '', rackBay: '', sepcat: '' };
       return { ...prev, [k]: { ...cur, assets: { ...cur.assets, [allocId]: meta } } };
     });
   };
@@ -186,7 +219,16 @@ export function useAllocations(grouped) {
       const base = (typeof prevMeta === 'object')
         ? prevMeta
         : { assetId: (prevMeta ?? ''), coeLoc: '', rackBay: '', sepcat: '' };
-      return { ...prev, [k]: { ...cur, assets: { ...cur.assets, [allocId]: { ...base, ...fields } } } };
+      return {
+        ...prev,
+        [k]: {
+          ...cur,
+          assets: {
+            ...cur.assets,
+            [allocId]: { ...base, ...uppercaseAssetMeta(fields) },
+          },
+        },
+      };
     });
   };
 
@@ -509,11 +551,12 @@ export function useAllocations(grouped) {
   };
 
   const addReelAllocation = (wo, code, alloc, options = {}) => {
-    const bounds = normalizeReelBounds(alloc.outer, alloc.inner);
+    const safeAlloc = uppercaseAllocationTextFields(alloc);
+    const bounds = normalizeReelBounds(safeAlloc.outer, safeAlloc.inner);
     if (!bounds) {
       return { error: "Enter valid outer/inner to compute footage" };
     }
-    const reelSerialKey = (alloc.reelSerial || "");
+    const reelSerialKey = (safeAlloc.reelSerial || "");
     const k = keyOf(wo, code);
     const current = buildReelState(allocState[k] || {});
     const { replaceId, assetMeta } = options || {};
@@ -524,7 +567,7 @@ export function useAllocations(grouped) {
     );
     const newAlloc = {
       id: replaceId || uid(),
-      ...alloc,
+      ...safeAlloc,
       outer: bounds.outer,
       inner: bounds.inner,
       footage: Math.abs(bounds.end - bounds.start),
@@ -544,7 +587,10 @@ export function useAllocations(grouped) {
         const previousMeta = typeof adjustedAssets[newAlloc.id] === "object"
           ? adjustedAssets[newAlloc.id]
           : { assetId: "", coeLoc: "", rackBay: "", sepcat: "" };
-        adjustedAssets[newAlloc.id] = { ...previousMeta, ...assetMeta };
+        adjustedAssets[newAlloc.id] = {
+          ...previousMeta,
+          ...uppercaseAssetMeta(assetMeta),
+        };
       }
       const adjustedCoe = { ...(cur.coe || {}) };
       for (const id of removedIds) {
@@ -571,8 +617,9 @@ export function useAllocations(grouped) {
       const cur = prev[k];
       if (!cur) return prev;
       const normalized = buildReelState(cur);
+      const normalizedFields = uppercaseAllocationTextFields(fields || {});
       const allocations = normalized.allocations.map((a) =>
-        a.id === allocId ? { ...a, ...fields } : a
+        a.id === allocId ? { ...a, ...normalizedFields } : a
       );
       return { ...prev, [k]: { ...cur, allocations } };
     });

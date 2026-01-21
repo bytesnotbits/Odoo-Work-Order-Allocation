@@ -668,8 +668,17 @@ export default function App() {
     });
   }, [historyStatusFilter, normalizedHistoryFilter, workOrderHistory]);
 
-  const featuredHistoryEntry =
-    workOrderHistory.find((entry) => entry.id === activeWO) || filteredHistory[0] || null;
+  const activeHistoryEntry =
+    workOrderHistory.find((entry) => entry.id === activeWO) || null;
+  const activeWOStatus =
+    activeHistoryEntry?.status ||
+    workOrderImportStatuses.get(activeWO)?.historyStatus ||
+    "open";
+  const activeWOStatusLabel =
+    WORK_ORDER_HISTORY_STATUSES.find((statusOption) => statusOption.value === activeWOStatus)
+      ?.label || activeWOStatus;
+  const isActiveWONotOpen = Boolean(activeWO && activeWOStatus !== "open");
+  const featuredHistoryEntry = activeHistoryEntry || filteredHistory[0] || null;
   const otherHistoryEntries = filteredHistory.filter(
     (entry) => entry.id !== featuredHistoryEntry?.id,
   );
@@ -793,19 +802,19 @@ export default function App() {
           <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
             Status
           </span>
-          <select
-            value={entry.status}
-            onChange={(event) => handleHistoryStatusChange(entry, event.target.value)}
-            className="rounded-xl border border-slate-200 bg-white px-2 py-1 text-xs focus:border-slate-900"
-            disabled={disableStatusChanges}
-          >
-            {WORK_ORDER_HISTORY_STATUSES.map((statusOption) => (
-              <option key={statusOption.value} value={statusOption.value}>
-                {statusOption.label}
-              </option>
-            ))}
-          </select>
-          <button
+        <select
+          value={entry.status}
+          onChange={(event) => handleHistoryStatusChange(entry, event.target.value)}
+          className="rounded-xl border border-slate-200 bg-white px-2 py-1 text-xs focus:border-slate-900"
+          disabled={disableStatusChanges}
+        >
+          {WORK_ORDER_HISTORY_STATUSES.map((statusOption) => (
+            <option key={statusOption.value} value={statusOption.value}>
+              {statusOption.label}
+            </option>
+          ))}
+        </select>
+        <button
             type="button"
             onClick={() => handleHistoryEntryExport(entry)}
             className="rounded-2xl border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 hover:border-slate-300"
@@ -814,6 +823,94 @@ export default function App() {
           </button>
         </div>
       </div>
+    );
+  };
+
+  const shellBgClass = isActiveWONotOpen ? "bg-amber-50" : "bg-gray-50";
+  const workOrderContentWrapperClass = isActiveWONotOpen
+    ? "mt-6 rounded-3xl border border-amber-200 bg-white/80 p-4 shadow-inner transition-all"
+    : "";
+  const renderWorkOrderContent = () => {
+    if (tab === "chargeout") {
+      return (
+        <Section
+          title="Material Charge-out"
+          subtitle="Review the spans and journal entries before sending the chargeout to MM"
+          variant="default"
+        >
+          {activeWO ? (
+            <CableReelChargeoutPrototype
+              workOrder={activeWO}
+              grouped={groupedWithMisc}
+              listReels={listReels}
+              listReelSpans={listReelSpans}
+              getReelChargeout={getReelChargeout}
+              setReelChargeout={setReelChargeout}
+              getItemState={getItemState}
+              updateAllocation={handleUpdateAllocation}
+            />
+          ) : (
+            <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-sm text-slate-500">
+              Load a work order to preview its chargeout spans and journal entry matches.
+            </div>
+          )}
+        </Section>
+      );
+    }
+
+    if (!activeWO) {
+      return <div className="text-gray-600">No work orders found in the file.</div>;
+    }
+
+    return (
+      <>
+        <Section
+          title={`Materials for WO ${activeWO}`}
+          subtitle={activeWODescription}
+          icon={Split}
+          variant={tab}
+        >
+          <WOView
+            wo={activeWO}
+            grouped={groupedWithMisc}
+            baseGrouped={grouped}
+            getItemState={getItemState}
+            upsertAllocation={handleUpsertAllocation}
+            removeAllocation={handleRemoveAllocation}
+            setAssetMeta={handleSetAssetMeta}
+            setReelSpan={handleSetReelSpan}
+            removeReelSpan={handleRemoveReelSpan}
+            getReelSpan={getReelSpan}
+            listReels={listReels}
+            getReelSpanMap={getReelSpanMap}
+            setCableMode={setCableMode}
+            addReelAllocation={handleAddReelAllocation}
+            updateAllocation={handleUpdateAllocation}
+            tab={tab}
+            allocState={allocState}
+            onResetItem={handleItemReset}
+            addMiscEntry={(itemNumber, description) => registerMiscEntry(activeWO, itemNumber, description)}
+            removeMiscEntry={(code) => removeMiscEntry(activeWO, code)}
+            nextMiscCode={nextMiscCode}
+          />
+        </Section>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={exportAllocations}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-gray-900 text-white"
+          >
+            <Download className="w-4 h-4" /> Export allocations
+          </button>
+          {isActiveWONotOpen && (
+            <Badge className="bg-amber-50 border-amber-200 text-amber-800">Read only</Badge>
+          )}
+          <Badge>
+            Posted/Returned derived from delivery quantities (returns = negative qty or lines containing
+            "Return").
+          </Badge>
+        </div>
+      </>
     );
   };
 
@@ -864,7 +961,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-8">
+    <div className={`min-h-screen ${shellBgClass} p-4 md:p-8`}>
       <div data-testid="app-shell" className="max-w-screen-2xl mx-auto">        <motion.header initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight flex items-center gap-2">
             <Package2 className="w-7 h-7" /> Work Order Material Allocation – Sample App
@@ -1077,6 +1174,17 @@ export default function App() {
                   </button>
                 ))}
               </div>
+              {isActiveWONotOpen && activeWO && (
+                <div className="rounded-2xl border border-amber-200 bg-amber-50/80 p-3 text-sm text-amber-900 shadow-sm">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-semibold">Closed work order — read only</span>
+                    <span className="text-xs font-semibold text-amber-700">{activeWOStatusLabel}</span>
+                  </div>
+                  <p className="text-xs text-amber-700 mt-1">
+                    You are viewing {activeWO} in {activeWOStatusLabel} status; allocations are locked.
+                  </p>
+                </div>
+              )}
             </div>
 
             <div className="space-y-3">
@@ -1148,71 +1256,10 @@ export default function App() {
           )}
         </div>
 
-        {tab === "chargeout" ? (
-          <Section
-            title="Material Charge-out"
-            subtitle="Review the spans and journal entries before sending the chargeout to MM"
-            variant="default"
-          >
-            {activeWO ? (
-              <CableReelChargeoutPrototype
-                workOrder={activeWO}
-                grouped={groupedWithMisc}
-                listReels={listReels}
-                listReelSpans={listReelSpans}
-                getReelChargeout={getReelChargeout}
-                setReelChargeout={setReelChargeout}
-                getItemState={getItemState}
-                updateAllocation={handleUpdateAllocation}
-              />
-            ) : (
-              <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-sm text-slate-500">
-                Load a work order to preview its chargeout spans and journal entry matches.
-              </div>
-            )}
-          </Section>
-        ) : activeWO ? (
-          <>
-            <Section
-              title={`Materials for WO ${activeWO}`}
-              subtitle={activeWODescription}
-              icon={Split}
-              variant={tab}
-            >
-              <WOView
-                wo={activeWO}
-                grouped={groupedWithMisc}
-                baseGrouped={grouped}
-                getItemState={getItemState}
-                upsertAllocation={handleUpsertAllocation}
-                removeAllocation={handleRemoveAllocation}
-                setAssetMeta={handleSetAssetMeta}
-                setReelSpan={handleSetReelSpan}
-                removeReelSpan={handleRemoveReelSpan}
-                getReelSpan={getReelSpan}
-                listReels={listReels}
-                getReelSpanMap={getReelSpanMap}
-                setCableMode={setCableMode}
-                addReelAllocation={handleAddReelAllocation}
-                updateAllocation={handleUpdateAllocation}
-                tab={tab}
-                allocState={allocState}
-                onResetItem={handleItemReset}
-                addMiscEntry={(itemNumber, description) => registerMiscEntry(activeWO, itemNumber, description)} // ensures function bound to current work order
-                removeMiscEntry={(code) => removeMiscEntry(activeWO, code)}
-                nextMiscCode={nextMiscCode}
-              />
-            </Section>
-
-            <div className="flex items-center gap-2">
-              <button onClick={exportAllocations} className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-gray-900 text-white">
-                <Download className="w-4 h-4" /> Export allocations
-              </button>
-              <Badge>Posted/Returned derived from delivery quantities (returns = negative qty or lines containing "Return").</Badge>
-            </div>
-          </>
+        {isActiveWONotOpen ? (
+          <div className={workOrderContentWrapperClass}>{renderWorkOrderContent()}</div>
         ) : (
-          <div className="text-gray-600">No work orders found in the file.</div>
+          renderWorkOrderContent()
         )}
         {showAuditPanel && (
           <div className="fixed inset-0 z-40 flex items-center justify-end">
