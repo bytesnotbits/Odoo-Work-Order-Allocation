@@ -45,12 +45,7 @@
 
 ### Setup MS Teams messaging
 
-### Implement the ability for the app to recognize work order revisions
-
-### Exportable report for charging out reels.
-The chargeout experience should present a landscape-formatted “Cable Reel Chargeout” screen that mirrors the data already collected: work order, engineer, item number, reel number, and inner/outer sequence info. Reels and their spans should be listed with dedicated rows per reel, and each span table should be followed by a totals block that summarizes quantity and length per reel (important because the material management team charges per reel, even if multiple reels carry the same material). Below the spans, include a digital “Totals” row that adds the per-reel numbers together and provides space for a total dollar value as the ledger needs it. 
-
-Each line in the form should accept input fields matching what the user types into the NISC chargeout screen (journal line numbers, reference, comments, etc.) so the Material Management Team can immediately note what they charged and make the reviewer’s reconciliation straightforward. The form should remain entirely digital—no printing—and should include signature/approval inputs for the engineer and material management verifier plus a timestamp and reminder that the material is not charged until the form is completed and verified. This would allow reviewers to match each chargeout form line with the corresponding journal entry line without switching contexts.
+### Reel Charge-out workflow
 
 #### Charge-out multiple work orders
 Material Management will need, at times, to create entries for more than one work order at a time. Can we make the charge-out form less about a specific work order, and more about the reel spans that have been flagged to be charged-out?

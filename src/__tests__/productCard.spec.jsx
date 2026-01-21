@@ -185,3 +185,150 @@ test('saving a new reel span auto-creates a pending allocation', async () => {
     }),
   );
 });
+
+test('update existing button calls updateAllocation when a regular allocation is selected', async () => {
+  const user = userEvent.setup();
+  const updateAllocation = vi.fn();
+  renderProductCard({
+    getItemState: () => ({
+      base: {},
+      extra: {
+        allocations: [
+          {
+            id: "ALLOC-1",
+            type: "regular",
+            allocationCategory: "Aerial",
+            qty: 2,
+            allocationId: "notes",
+          },
+        ],
+      },
+      totalAvailable: 10,
+      allocatedSum: 2,
+      remaining: 8,
+      pendingReturnSum: 0,
+    }),
+    updateAllocation,
+  });
+
+  const [cardHeading] = screen.getAllByText(/Quantity allocation/i);
+  const allocationCard = cardHeading.closest('[role="button"]');
+  await user.click(allocationCard);
+
+  const quantityInput = screen.getByRole('spinbutton');
+  await user.clear(quantityInput);
+  await user.type(quantityInput, "4");
+
+  const updateButton = screen.getByRole('button', { name: /update selected asset/i });
+  await user.click(updateButton);
+
+  expect(updateAllocation).toHaveBeenCalledWith(
+    "WO-TEST",
+    "ITEM-1",
+    "ALLOC-1",
+    expect.objectContaining({ qty: 4 }),
+  );
+});
+
+test('update existing syncs SCXR asset metadata via setAssetMeta', async () => {
+  const user = userEvent.setup();
+  const setAssetMeta = vi.fn();
+  const updateAllocation = vi.fn();
+  renderProductCard({
+    product: { code: "ITEM-1", desc: "Test Item", posted: 0, returned: 0, group: "SCXR" },
+    getItemState: () => ({
+      base: {},
+      extra: {
+        allocations: [
+          {
+            id: "ALLOC-1",
+            type: "regular",
+            allocationCategory: "SCXR",
+            qty: 2,
+            allocationId: "notes",
+          },
+        ],
+        assets: {
+          "ALLOC-1": { coeLoc: "HUNF", rackBay: "RB-1", sepcat: "411J" },
+        },
+      },
+      totalAvailable: 10,
+      allocatedSum: 2,
+      remaining: 8,
+      pendingReturnSum: 0,
+    }),
+    updateAllocation,
+    setAssetMeta,
+  });
+
+  const [cardHeading] = screen.getAllByText(/Quantity allocation/i);
+  const allocationCard = cardHeading.closest('[role="button"]');
+  await user.click(allocationCard);
+
+  const coeInput = screen.getByPlaceholderText(/COE LOC/i);
+  await user.clear(coeInput);
+  await user.type(coeInput, "test");
+
+  const quantityInput = screen.getByRole('spinbutton');
+  await user.clear(quantityInput);
+  await user.type(quantityInput, "4");
+
+  const updateButton = screen.getByRole('button', { name: /update selected asset/i });
+  await user.click(updateButton);
+
+  expect(updateAllocation).toHaveBeenCalledWith(
+    "WO-TEST",
+    "ITEM-1",
+    "ALLOC-1",
+    expect.objectContaining({ qty: 4 }),
+  );
+  expect(setAssetMeta).toHaveBeenCalledWith(
+    "WO-TEST",
+    "ITEM-1",
+    "ALLOC-1",
+    expect.objectContaining({
+      coeLoc: "test",
+      rackBay: "RB-1",
+      sepcat: "411J",
+    }),
+  );
+});
+
+test('update existing shows a confirmation message', async () => {
+  const user = userEvent.setup();
+  const updateAllocation = vi.fn();
+  renderProductCard({
+    getItemState: () => ({
+      base: {},
+      extra: {
+        allocations: [
+          {
+            id: "ALLOC-1",
+            type: "regular",
+            allocationCategory: "Aerial",
+            qty: 2,
+            allocationId: "notes",
+          },
+        ],
+      },
+      totalAvailable: 10,
+      allocatedSum: 2,
+      remaining: 8,
+      pendingReturnSum: 0,
+    }),
+    updateAllocation,
+  });
+
+  const [cardHeading] = screen.getAllByText(/Quantity allocation/i);
+  const allocationCard = cardHeading.closest('[role="button"]');
+  await user.click(allocationCard);
+
+  const quantityInput = screen.getByRole('spinbutton');
+  await user.clear(quantityInput);
+  await user.type(quantityInput, "4");
+
+  const updateButton = screen.getByRole('button', { name: /update selected asset/i });
+  await user.click(updateButton);
+
+  expect(screen.getByText(/Allocation updated!/i)).toBeInTheDocument();
+});

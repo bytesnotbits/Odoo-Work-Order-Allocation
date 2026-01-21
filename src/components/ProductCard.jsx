@@ -129,9 +129,14 @@ export default function ProductCard({
   const [rackBayInput, setRackBayInput] = useState("");
   const [sepcatInput, setSepcatInput] = useState(SEPCAT_OPTIONS[0]);
   const [highlightedFields, setHighlightedFields] = useState({});
+  const [updateFeedback, setUpdateFeedback] = useState("");
   const highlightTimeoutsRef = useRef({});
+  const updateFeedbackTimeout = useRef(null);
   useEffect(() => () => {
     Object.values(highlightTimeoutsRef.current).forEach(clearTimeout);
+  }, []);
+  useEffect(() => () => {
+    if (updateFeedbackTimeout.current) clearTimeout(updateFeedbackTimeout.current);
   }, []);
   const FIELD_KEYS = {
     ALLOCATION_QTY: "allocation-qty",
@@ -167,6 +172,16 @@ export default function ProductCard({
         return next;
       });
       delete highlightTimeoutsRef.current[fieldKey];
+    }, 2000);
+  };
+  const showUpdateFeedback = () => {
+    setUpdateFeedback("Allocation updated!");
+    if (updateFeedbackTimeout.current) {
+      clearTimeout(updateFeedbackTimeout.current);
+    }
+    updateFeedbackTimeout.current = setTimeout(() => {
+      setUpdateFeedback("");
+      updateFeedbackTimeout.current = null;
     }, 2000);
   };
   const updateFieldWithHighlight = (setter, fieldKey, value) => {
@@ -371,7 +386,7 @@ export default function ProductCard({
   const secondaryButton = [
     "inline-flex items-center gap-2 px-3 py-2 rounded-xl border transition font-semibold shadow-sm",
     "bg-white text-slate-900 border-slate-200",
-    "hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-slate-900",
+    "hover:bg-slate-100 hover:border-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-slate-900",
     "disabled:opacity-50 disabled:cursor-not-allowed",
   ].join(" ");
 
@@ -449,6 +464,23 @@ export default function ProductCard({
     }
     const payload = buildRegularPayload(qty, categoryName);
     updateAllocation(wo, product.code, selectedAllocation.id, payload);
+    if (
+      isScxrProduct &&
+      typeof setAssetMeta === "function" &&
+      selectedAllocation?.id
+    ) {
+      setAssetMeta(
+        wo,
+        product.code,
+        selectedAllocation.id,
+        {
+          coeLoc: coeLocInput,
+          rackBay: rackBayInput,
+          sepcat: sepcatInput,
+        },
+      );
+    }
+    showUpdateFeedback();
   }
 
   function addReelPiece() {
@@ -779,14 +811,6 @@ export default function ProductCard({
         )}
       </div>
 
-      <div className="mt-3">
-        <span
-          className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-wide ${modeBadgeClass}`}
-        >
-          {isAccountingMode ? "Accounting form" : "Engineering form"}
-        </span>
-      </div>
-
       <div className="mt-4 grid md:grid-cols-2 gap-4">
           {/* LEFT: Add allocation (unchanged) */}
           <div className={`rounded-xl p-3 border ${modeSectionBorder} ${modeSectionBg}`}>
@@ -906,7 +930,7 @@ export default function ProductCard({
                   onChange={(e) => setReelSerial(e.target.value)}
                   placeholder="e.g., REEL-12345 or SN-0001"
                 />
-                <div className="flex gap-2">
+                <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={addRegular}
@@ -925,6 +949,12 @@ export default function ProductCard({
                   >
                     Update existing
                   </button>
+                </div>
+                <div
+                  className="min-h-[1.25rem] text-xs font-semibold uppercase tracking-wide text-emerald-600"
+                  aria-live="polite"
+                >
+                  {updateFeedback || "\u00A0"}
                 </div>
               </div>
             )}

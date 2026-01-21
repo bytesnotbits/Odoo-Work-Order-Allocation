@@ -993,18 +993,20 @@ export default function App() {
 
             <div className="space-y-2" ref={searchWrapperRef}>
               <div className="relative">
-                <input
-                  name="history-search"
-                  type="text"
-                  placeholder="Search by work order or description"
-                  className="w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:border-slate-900 focus:ring-0"
-                  value={historyFilter}
-                  onFocus={() => setShowSuggestions(true)}
-                  onChange={(event) => {
-                    setHistoryFilter(event.target.value);
-                    setShowSuggestions(true);
-                  }}
-                />
+                <div className="bg-slate-100 rounded-xl border border-slate-200 p-1 shadow-sm">
+                  <input
+                    name="history-search"
+                    type="text"
+                    placeholder="Search by work order or description"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 focus:border-slate-900 focus:outline-none"
+                    value={historyFilter}
+                    onFocus={() => setShowSuggestions(true)}
+                    onChange={(event) => {
+                      setHistoryFilter(event.target.value);
+                      setShowSuggestions(true);
+                    }}
+                  />
+                </div>
                 {showSuggestions && (
                   <div className="absolute inset-x-0 top-full z-10 mt-1 max-h-56 overflow-auto rounded-2xl border border-slate-200 bg-white shadow-lg">
                     {dropdownSuggestions.length > 0 ? (
