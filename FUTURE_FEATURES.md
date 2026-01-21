@@ -28,17 +28,11 @@
 - The chatbot would then be able to answer user questions or walk them through specific tasks (“How do I convert a pending allocation to a reel?”) by referencing the manual, ensuring consistent, step-by-step guidance without requiring an engineer to study a manual in order to utilize the app.
 - Maybe have a portion of the app house a chatwindow the user can use to access HCTC's internal AI suite for convenience.
 
-
 ### Connect APIs to pull all the material moves involving work orders.
 
 #### Create a comparison between, what Odoo shows to be charged, what was actually charged in NISC making sure to take returns into account.
 
 #### Connect to NISC via API so that the work order data is automatically populated in real-time and does not require the user to upload CSVs manually.
-
-### Shared backend database (interim)
-- Provide a temporary shared data store on the LAN so multiple users can collaborate without manual JSON exports.
-- Use a small LAN API with SQLite on a dedicated machine; the app reads/writes over HTTP and the DB stays local to that host.
-- Capture audit history (who/when) and enforce charge-out rules consistently while the SQL backend is pending.
 
 ### Create a centralized SQL database that becomes one source of truth.
 - Have this DB hosted by HCTC behind MS Azure authentication

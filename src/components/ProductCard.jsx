@@ -1354,7 +1354,7 @@ export default function ProductCard({
                     ? "border-yellow-200 bg-yellow-50 text-yellow-800"
                     : isReturned
                       ? "border-slate-200 bg-slate-100 text-slate-500"
-                      : "border-slate-200 bg-white text-slate-900";
+                      : "border-emerald-200 bg-emerald-50 text-emerald-900";
                 const isSelectedAllocation = !isSyntheticPendingCard && selectedAllocation?.id === a.id;
                 const isSelectedPendingCard = isSyntheticPendingCard && selectedPendingCardId === a.id;
                 const selectionClasses = isSelectedAllocation || isSelectedPendingCard
