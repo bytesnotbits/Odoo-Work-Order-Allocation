@@ -5,12 +5,17 @@ const DEFAULT_STATUS = "open";
 
 export const WORK_ORDER_HISTORY_STATUSES = [
   { value: "open", label: "Open" },
-  { value: "to_close", label: "To close" },
-  { value: "submitted", label: "Submitted for close" },
+  { value: "submitted", label: "Submitted for Close" },
+  { value: "closed", label: "Closed" },
 ];
 
 const isValidStatus = (value) =>
   WORK_ORDER_HISTORY_STATUSES.some((status) => status.value === value);
+
+const normalizeStatus = (value) => {
+  if (value === "to_close") return "submitted";
+  return value;
+};
 
 function storageAvailable() {
   return typeof window !== "undefined" && Boolean(window?.localStorage);
@@ -44,7 +49,10 @@ export function sanitizeHistoryEntries(entries) {
     .filter((entry) => entry && typeof entry === "object" && entry.id)
     .map((entry) => ({
       ...entry,
-      status: isValidStatus(entry.status) ? entry.status : DEFAULT_STATUS,
+      status: (() => {
+        const normalized = normalizeStatus(entry.status);
+        return isValidStatus(normalized) ? normalized : DEFAULT_STATUS;
+      })(),
       createdAt: entry.createdAt || "",
       updatedAt: entry.updatedAt || "",
       modifiedBy: entry.modifiedBy || "",

@@ -8,7 +8,7 @@ import WOView from "./components/WOView";
 import CableReelChargeoutPrototype from "./components/CableReelChargeoutPrototype";
 
 import { MISC_PRODUCT_CODE, MISC_PRODUCT_DESC, MISC_PRODUCT_PREFIX } from "./lib/data";
-import { normalizeRow, groupRows } from "./lib/rows";
+import { normalizeRow, groupRows, normalizeWorkOrderStatus } from "./lib/rows";
 import { exportAllocationsToXLSX } from "./lib/xlsxExport";
 import { useAllocations } from "./hooks/useAllocations";
 import { readFirstSheet } from "./utils/xlsxIO";
@@ -85,6 +85,21 @@ export default function App() {
     }
     return map;
   }, [rows]);
+  const workOrderImportStatuses = useMemo(() => {
+    const map = new Map();
+    for (const row of rows) {
+      if (!row?.workOrder) continue;
+      const normalized = normalizeWorkOrderStatus(row.status);
+      if (!normalized) continue;
+      const existing = map.get(row.workOrder);
+      if (normalized === "closed") {
+        map.set(row.workOrder, "closed");
+      } else if (!existing) {
+        map.set(row.workOrder, "open");
+      }
+    }
+    return map;
+  }, [rows]);
   const groupedWithMisc = useMemo(() => {
     const map = new Map();
     for (const [wo, gm] of grouped.entries()) {
@@ -113,6 +128,10 @@ export default function App() {
     setEntryStatus,
   } = useWorkOrderHistory();
   const { entries: auditEntries, recordAuditEvent } = useAuditTrail();
+  const workOrderHistoryRef = useRef(workOrderHistory);
+  useEffect(() => {
+    workOrderHistoryRef.current = workOrderHistory;
+  }, [workOrderHistory]);
 
   const userDisplayName = userIdentity.name || userIdentity.email || "Unknown user";
   const isIdentityComplete =
@@ -286,7 +305,6 @@ export default function App() {
     getReelChargeout,
     setReelChargeout,
     listReelSpans,
-    lockWorkOrder,
     setCableMode,
     addReelAllocation,
     updateAllocation,
@@ -649,13 +667,23 @@ export default function App() {
     }
     const payload = buildWorkOrderSnapshot(activeWO);
     if (!payload) return;
-    upsertHistoryEntry({
+    const importedStatus = workOrderImportStatuses.get(activeWO) || "";
+    const currentStatus = workOrderHistoryRef.current.find(
+      (entry) => entry.id === activeWO,
+    )?.status;
+    const shouldApplyImportStatus =
+      importedStatus && (importedStatus === "closed" || currentStatus !== "submitted");
+    const historyEntry = {
       id: activeWO,
       description: activeWODescription,
       lastOpened: new Date().toISOString(),
       snapshot: payload,
       modifiedBy: userDisplayName,
-    });
+    };
+    if (shouldApplyImportStatus) {
+      historyEntry.status = importedStatus;
+    }
+    upsertHistoryEntry(historyEntry);
     if (lastViewedWorkOrderRef.current !== activeWO) {
       recordAuditEvent({
         workOrderId: activeWO,
@@ -672,6 +700,7 @@ export default function App() {
     isHydrated,
     upsertHistoryEntry,
     recordAuditEvent,
+    workOrderImportStatuses,
     userDisplayName,
   ]);
 
@@ -739,6 +768,9 @@ export default function App() {
           <div className="mt-1 text-xs text-slate-500">Last modified by {entry.modifiedBy}</div>
         )}
         <div className="mt-2 flex flex-wrap items-center gap-2">
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+            Status
+          </span>
           <select
             value={entry.status}
             onChange={(event) => handleHistoryStatusChange(entry, event.target.value)}
@@ -1131,7 +1163,6 @@ export default function App() {
                 getReelSpan={getReelSpan}
                 listReels={listReels}
                 getReelSpanMap={getReelSpanMap}
-                lockWorkOrder={lockWorkOrder}
                 setCableMode={setCableMode}
                 addReelAllocation={handleAddReelAllocation}
                 updateAllocation={handleUpdateAllocation}

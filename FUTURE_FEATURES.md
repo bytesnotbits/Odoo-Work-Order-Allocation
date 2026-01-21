@@ -6,21 +6,14 @@
 - Engineers lock a work order via `lockWorkOrder` (`src/hooks/useAllocations.js`) once allocations are verified. This sets `allocState[k].locked = true`, and the UI (WOView/ProductCard) disables edits.
 - Request: allow accountants to unlock/return a work order if issues are found so engineers can adjust allocations again. Potential approach: add `unlockWorkOrder` in the hook, expose it to `App`, and provide a “Return to engineering” control (e.g., tied to history entry status changes) so the two sides coordinate around an explicit status transition.
 
-### Per-Item Reset (Replace Global Clear History)
-- Request: replace any global "clear history" action with a per-item reset control.
-- Behavior: reset all assets for that specific item back to default values so the engineer can start fresh on just that item, without touching other items on the work order.
-
 ## Future
-
-### Notifications & Audit Trail
-- Future plan: tie the status history changes (open → submitted → returned) to both an unlock flow and a notification system so accounting gets notified when a work order is ready or returned.
 
 ### User Identity Integration
 - The app currently has no built-in identity; any “who did it” data must be provided by the user manually.
 - Request: integrate Azure (MS Entra/Azure AD) via MSAL (`@azure/msal-browser` + `@azure/msal-react`). Wrap `App` in `MsalProvider`, read `instance.getActiveAccount()`, and store that identity in context so every history/notification payload can know who acted.
 
 ### Microsoft Teams Messaging
-- Sending Teams messages would keep both engineering and accounting aware of status changes.
+- Sending Teams messages would keep all parties involved aware of status changes.
 - Implementation ideas:
   1. Add a backend that receives status-change webhooks (lock/unlock, history updates) from the SPA and delivers Teams (Graph or Incoming Webhook) messages safely.
   2. Alternatively, call Microsoft Graph directly from the browser once MSAL provides a token, requesting the necessary permissions (ChatMessage.Send, ChannelMessage.Send).
@@ -36,10 +29,11 @@
 - Maybe have a portion of the app house a chatwindow the user can use to access HCTC's internal AI suite for convenience.
 
 
-### Connect Odoo via API and pull all the material moves involving work orders.
-#### Create a comparison between, what Odoo shows to be charged, what was actually charged. This should take returns into account.
+### Connect APIs to pull all the material moves involving work orders.
 
-### Connect to NISC via API so that the work order data is automatically populated in real-time and does not require the user to upload CSVs manually.
+#### Create a comparison between, what Odoo shows to be charged, what was actually charged in NISC making sure to take returns into account.
+
+#### Connect to NISC via API so that the work order data is automatically populated in real-time and does not require the user to upload CSVs manually.
 
 ### Shared backend database (interim)
 - Provide a temporary shared data store on the LAN so multiple users can collaborate without manual JSON exports.
@@ -47,7 +41,7 @@
 - Capture audit history (who/when) and enforce charge-out rules consistently while the SQL backend is pending.
 
 ### Create a centralized SQL database that becomes one source of truth.
-### Have this DB hosted by HCTC behind MS Azure authentication
+- Have this DB hosted by HCTC behind MS Azure authentication
 
 ### Setup MS Teams messaging
 

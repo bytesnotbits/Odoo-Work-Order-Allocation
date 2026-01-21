@@ -68,6 +68,23 @@ function parseNumber(v) {
   return isNeg ? -n : n;
 }
 
+export function normalizeWorkOrderStatus(value) {
+  const label = String(value || "").trim().toLowerCase();
+  if (!label) return "";
+  if (
+    label.includes("close") ||
+    label.includes("complete") ||
+    label.includes("completed") ||
+    label.includes("final")
+  ) {
+    return "closed";
+  }
+  if (label.includes("open") || label.includes("progress") || label.includes("active")) {
+    return "open";
+  }
+  return "";
+}
+
 export function parseProductFromLine(line, explicitCode = "", explicitDesc = "") {
   const raw = line || "";
   const m = raw.match(/\[(.*?)\]/);

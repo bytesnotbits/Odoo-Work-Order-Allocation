@@ -7,7 +7,7 @@ import { isMiscProductCode, MISC_PRODUCT_CODE, MISC_PRODUCT_PREFIX } from "../li
 
 export default function WOView({
   wo, grouped, baseGrouped, getItemState, upsertAllocation, removeAllocation,
-  setAssetMeta, setReelSpan, removeReelSpan, getReelSpan, listReels, getReelSpanMap, lockWorkOrder, tab, allocState, setCableMode,
+  setAssetMeta, setReelSpan, removeReelSpan, getReelSpan, listReels, getReelSpanMap, tab, allocState, setCableMode,
   addReelAllocation, updateAllocation,
   addMiscEntry, removeMiscEntry, nextMiscCode, onResetItem,
 }) {
@@ -184,7 +184,7 @@ export default function WOView({
 
       <div className="flex items-center gap-3 pt-2 border-t">
         {(anyOverAllocated || anyUnallocated) && (
-          <Badge><AlertTriangle className="inline w-4 h-4 mr-1" /> Open issues: resolve before completion</Badge>
+          <Badge><AlertTriangle className="inline w-4 h-4 mr-1" /> Open issues: resolve before submitting for close</Badge>
         )}
         {allAllocated ? (
           <Badge><CheckCircle2 className="inline w-4 h-4 mr-1" /> Engineering: All material allocated</Badge>
@@ -196,19 +196,6 @@ export default function WOView({
         ) : (
           <Badge><AlertTriangle className="inline w-4 h-4 mr-1" /> Accounting: Asset IDs missing</Badge>
         )}
-        <button
-          onClick={() => lockWorkOrder(wo)}
-          disabled={anyOverAllocated || anyUnallocated}
-          title={(anyOverAllocated || anyUnallocated) ? "Resolve issues before completion" : ""}
-          className={[
-            "ml-auto px-3 py-2 rounded-xl border shadow-sm disabled:opacity-50",
-            (anyOverAllocated || anyUnallocated)
-              ? "bg-gray-100 text-gray-500 border-gray-200"
-              : "bg-gray-900 text-white border-gray-900 hover:bg-gray-800 active:bg-gray-700"
-          ].join(" ")}
-        >
-          Mark complete
-        </button>
       </div>
     </div>
   );
