@@ -20,6 +20,19 @@ test('normalizeRow maps columns and types', () => {
   expect(r.code).toBe('1396R')
 })
 
+test('normalizeRow appends revision to work order and tracks base', () => {
+  const r = normalizeRow({
+    'WORK ORDER': 'WO9',
+    Revision: 2,
+    'Item': 'A',
+    'Item Description': 'Item A',
+    'Quantity Charged': 1,
+  })
+  expect(r.workOrder).toBe('WO9 (Rev 2)')
+  expect(r.workOrderBase).toBe('WO9')
+  expect(r.revision).toBe(2)
+})
+
 test('isReturnRow detects negative qty and "Return" lines', () => {
   expect(isReturnRow({ deliveryQty: -1, productLine: ''})).toBe(true)
   expect(isReturnRow({ deliveryQty: 1, productLine: 'Return - [1396R]' })).toBe(true)
@@ -42,6 +55,16 @@ test('groupRows builds posted/returned by WO + product code', () => {
   expect(item.posted).toBe(10)
   expect(item.returned).toBe(3)
   expect(item.isCable).toBe(true)
+})
+
+test('groupRows separates revisions into distinct work orders', () => {
+  const rows = [
+    normalizeRow({ 'WORK ORDER':'WO1', Revision: 0, 'Order Lines':'[111] FIBER', 'Order Lines/Delivery Quantity': 1 }),
+    normalizeRow({ 'WORK ORDER':'WO1', Revision: 1, 'Order Lines':'[111] FIBER', 'Order Lines/Delivery Quantity': 2 }),
+  ]
+  const g = groupRows(rows)
+  expect(g.get('WO1').get('111').posted).toBe(1)
+  expect(g.get('WO1 (Rev 1)').get('111').posted).toBe(2)
 })
 
 test('normalizeRow + groupRows captures group column', () => {

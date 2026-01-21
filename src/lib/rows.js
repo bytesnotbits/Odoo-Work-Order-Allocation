@@ -1,7 +1,17 @@
 // Excel row normalization + grouping helpers
 
 export function normalizeRow(r, idx = 0) {
-  const workOrder = String(r["WORK ORDER"] ?? r["Work Order"] ?? r["WorkOrder"] ?? "").trim();
+  const workOrderBase = String(r["WORK ORDER"] ?? r["Work Order"] ?? r["WorkOrder"] ?? "").trim();
+  const revision = normalizeRevision(
+    r["Revision"]
+      ?? r["REVISION"]
+      ?? r["Rev"]
+      ?? r["rev"]
+      ?? r["Work Order Revision"]
+      ?? r["Work Order Rev"]
+      ?? ""
+  );
+  const workOrder = formatWorkOrderKey(workOrderBase, revision);
   const orderRef = String(r["Order Reference"] ?? r["Order"] ?? r["SO"] ?? "").trim();
   const itemCode = String(r["Item"] ?? r["ITEM"] ?? "").trim();
   const itemDesc = String(r["Item Description"] ?? r["ITEM DESCRIPTION"] ?? "").trim();
@@ -39,6 +49,8 @@ export function normalizeRow(r, idx = 0) {
 
   return {
     workOrder,
+    workOrderBase,
+    revision,
     orderRef,
     productLine,
     itemCode,
@@ -53,6 +65,25 @@ export function normalizeRow(r, idx = 0) {
     group: miGroup,
     workOrderDescription,
   };
+}
+
+function normalizeRevision(value) {
+  if (value === null || value === undefined) return 0;
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return Math.max(0, Math.floor(value));
+  }
+  const raw = String(value).trim();
+  if (!raw) return 0;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed)) return 0;
+  return Math.max(0, Math.floor(parsed));
+}
+
+function formatWorkOrderKey(base, revision) {
+  const normalizedBase = String(base || "").trim();
+  if (!normalizedBase) return "";
+  if (!revision) return normalizedBase;
+  return `${normalizedBase} (Rev ${revision})`;
 }
 
 function parseNumber(v) {
