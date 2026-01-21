@@ -8,7 +8,12 @@ import WOView from "./components/WOView";
 import CableReelChargeoutPrototype from "./components/CableReelChargeoutPrototype";
 
 import { MISC_PRODUCT_CODE, MISC_PRODUCT_DESC, MISC_PRODUCT_PREFIX } from "./lib/data";
-import { normalizeRow, groupRows, normalizeWorkOrderStatus } from "./lib/rows";
+import {
+  normalizeRow,
+  groupRows,
+  normalizeWorkOrderStatus,
+  mapWorkOrderStatusToHistoryStatus,
+} from "./lib/rows";
 import { exportAllocationsToXLSX } from "./lib/xlsxExport";
 import { useAllocations } from "./hooks/useAllocations";
 import { readFirstSheet } from "./utils/xlsxIO";
@@ -89,13 +94,15 @@ export default function App() {
     const map = new Map();
     for (const row of rows) {
       if (!row?.workOrder) continue;
-      const normalized = normalizeWorkOrderStatus(row.status);
-      if (!normalized) continue;
+      const label = normalizeWorkOrderStatus(row.status);
+      if (!label) continue;
+      const historyStatus = mapWorkOrderStatusToHistoryStatus(label);
+      if (!historyStatus) continue;
       const existing = map.get(row.workOrder);
-      if (normalized === "closed") {
-        map.set(row.workOrder, "closed");
+      if (historyStatus === "closed") {
+        map.set(row.workOrder, { label, historyStatus });
       } else if (!existing) {
-        map.set(row.workOrder, "open");
+        map.set(row.workOrder, { label, historyStatus });
       }
     }
     return map;
@@ -626,6 +633,29 @@ export default function App() {
   const noteForActive = workOrderNotes[activeWO] || "";
   const activeWODescription = workOrderDescriptions.get(activeWO) || "";
 
+  const isHistoryStatusLocked = useCallback(
+    (entryId) => {
+      if (!entryId) return false;
+      return workOrderImportStatuses.get(entryId)?.historyStatus === "closed";
+    },
+    [workOrderImportStatuses],
+  );
+
+  const handleHistoryStatusChange = useCallback(
+    (entry, status) => {
+      if (!entry || !status) return;
+      if (isHistoryStatusLocked(entry.id)) return;
+      setEntryStatus(entry.id, status, userDisplayName);
+      recordAuditEvent({
+        workOrderId: entry.id,
+        action: "Updated work order status",
+        details: `Status changed to ${status}`,
+        modifiedBy: userDisplayName,
+      });
+    },
+    [isHistoryStatusLocked, recordAuditEvent, setEntryStatus, userDisplayName],
+  );
+
   const normalizedHistoryFilter = historyFilter.trim().toLowerCase();
   const filteredHistory = useMemo(() => {
     return workOrderHistory.filter((entry) => {
@@ -643,6 +673,9 @@ export default function App() {
   const otherHistoryEntries = filteredHistory.filter(
     (entry) => entry.id !== featuredHistoryEntry?.id,
   );
+  const featuredHistoryStatusLocked = featuredHistoryEntry
+    ? isHistoryStatusLocked(featuredHistoryEntry.id)
+    : false;
   const dropdownSuggestions = otherHistoryEntries.slice(0, DROPDOWN_SUGGESTION_LIMIT);
   const auditEntriesForActive = useMemo(() => {
     if (!activeWO) return [];
@@ -667,7 +700,8 @@ export default function App() {
     }
     const payload = buildWorkOrderSnapshot(activeWO);
     if (!payload) return;
-    const importedStatus = workOrderImportStatuses.get(activeWO) || "";
+    const importMetadata = workOrderImportStatuses.get(activeWO);
+    const importedStatus = importMetadata?.historyStatus || "";
     const currentStatus = workOrderHistoryRef.current.find(
       (entry) => entry.id === activeWO,
     )?.status;
@@ -723,20 +757,8 @@ export default function App() {
     }
   };
 
-  const handleHistoryStatusChange = (entry, status) => {
-    if (!entry || !status) return;
-    setEntryStatus(entry.id, status, userDisplayName);
-    recordAuditEvent({
-      workOrderId: entry.id,
-      action: "Updated work order status",
-      details: `Status changed to ${status}`,
-      modifiedBy: userDisplayName,
-    });
-  };
-
   const snapshotSourceLabel = localSnapshot?.source === "indexedDB" ? "IndexedDB" : "browser storage";
-  
-  const HistoryEntryCard = ({ entry, highlight = false }) => {
+  const HistoryEntryCard = ({ entry, highlight = false, disableStatusChanges = false }) => {
     const statusDefinition = WORK_ORDER_HISTORY_STATUSES.find(
       (statusOption) => statusOption.value === entry.status,
     );
@@ -775,6 +797,7 @@ export default function App() {
             value={entry.status}
             onChange={(event) => handleHistoryStatusChange(entry, event.target.value)}
             className="rounded-xl border border-slate-200 bg-white px-2 py-1 text-xs focus:border-slate-900"
+            disabled={disableStatusChanges}
           >
             {WORK_ORDER_HISTORY_STATUSES.map((statusOption) => (
               <option key={statusOption.value} value={statusOption.value}>
@@ -1060,7 +1083,11 @@ export default function App() {
               {featuredHistoryEntry ? (
                 <>
                   <div className="text-xs text-slate-500">Currently open work order</div>
-                  <HistoryEntryCard entry={featuredHistoryEntry} highlight />
+                  <HistoryEntryCard
+                    entry={featuredHistoryEntry}
+                    highlight
+                    disableStatusChanges={featuredHistoryStatusLocked}
+                  />
                 </>
               ) : (
                 <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-xs text-slate-500">

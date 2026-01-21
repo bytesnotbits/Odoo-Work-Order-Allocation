@@ -99,20 +99,55 @@ function parseNumber(v) {
   return isNeg ? -n : n;
 }
 
+const WORK_ORDER_STATUS_DEFINITIONS = [
+  {
+    label: "Capitalized",
+    predicate: (candidate) => candidate.includes("capitalized"),
+  },
+  {
+    label: "Abandoned",
+    predicate: (candidate) => candidate.includes("abandon"),
+  },
+  {
+    label: "Closed",
+    predicate: (candidate) =>
+      candidate.includes("close") ||
+      candidate.includes("complete") ||
+      candidate.includes("completed") ||
+      candidate.includes("final"),
+  },
+  {
+    label: "Estimate",
+    predicate: (candidate) => candidate.includes("estimate"),
+  },
+  {
+    label: "Open",
+    predicate: (candidate) =>
+      candidate.includes("open") || candidate.includes("progress") || candidate.includes("active"),
+  },
+];
+
 export function normalizeWorkOrderStatus(value) {
-  const label = String(value || "").trim().toLowerCase();
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  const candidate = raw.toLowerCase();
+  for (const definition of WORK_ORDER_STATUS_DEFINITIONS) {
+    if (definition.predicate(candidate)) {
+      return definition.label;
+    }
+  }
+  return "";
+}
+
+const IMPORT_STATUS_HISTORY = {
+  closed: new Set(["Closed", "Capitalized", "Abandoned"]),
+  open: new Set(["Open", "Estimate"]),
+};
+
+export function mapWorkOrderStatusToHistoryStatus(label) {
   if (!label) return "";
-  if (
-    label.includes("close") ||
-    label.includes("complete") ||
-    label.includes("completed") ||
-    label.includes("final")
-  ) {
-    return "closed";
-  }
-  if (label.includes("open") || label.includes("progress") || label.includes("active")) {
-    return "open";
-  }
+  if (IMPORT_STATUS_HISTORY.closed.has(label)) return "closed";
+  if (IMPORT_STATUS_HISTORY.open.has(label)) return "open";
   return "";
 }
 
