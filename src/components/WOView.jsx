@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import Badge from "./Badge";
 import { AlertTriangle, CheckCircle2 } from "lucide-react";
 import ProductCard from "./ProductCard";
@@ -31,6 +31,37 @@ export default function WOView({
     if (isMiscProduct(product)) return true;
     return state.extra.allocations.length === 0 || state.extra.allocations.every((a) => (allocState[`${wo}|${product.code}`]?.assets || {})[a.id]);
   });
+
+  const rippleTimerRef = useRef(null);
+  const [rippleActive, setRippleActive] = useState(false);
+  const prevAllAllocatedRef = useRef(allAllocated);
+
+  useEffect(() => () => {
+    if (rippleTimerRef.current) {
+      clearTimeout(rippleTimerRef.current);
+      rippleTimerRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (prevAllAllocatedRef.current === allAllocated) {
+      return;
+    }
+    if (rippleTimerRef.current) {
+      clearTimeout(rippleTimerRef.current);
+      rippleTimerRef.current = null;
+    }
+    if (allAllocated) {
+      setRippleActive(true);
+      rippleTimerRef.current = setTimeout(() => {
+        setRippleActive(false);
+        rippleTimerRef.current = null;
+      }, 900);
+    } else {
+      setRippleActive(false);
+    }
+    prevAllAllocatedRef.current = allAllocated;
+  }, [allAllocated]);
 
   const safeAlert = (msg) => {
     try {
@@ -92,9 +123,17 @@ export default function WOView({
   const visibleProductStates = activeSearchTerm ? productStates.filter(matchesSearch) : productStates;
   const visibleProducts = visibleProductStates.map(({ product }) => product);
   const isSearchActive = Boolean(activeSearchTerm);
+  const wrapperClassName = [
+    "space-y-6",
+    "relative",
+    "overflow-hidden",
+    "progress-ripple-wrapper",
+    allAllocated ? "progress-ripple-wrapper--complete" : "",
+  ].filter(Boolean).join(" ");
   return (
-    <div className="space-y-6">
-      {products.length === 0 && (<div className="text-sm text-gray-600">No products for this work order.</div>)}
+    <div className={wrapperClassName}>
+      <div className="relative">
+        {products.length === 0 && (<div className="text-sm text-gray-600">No products for this work order.</div>)}
 
       {hasManyProducts && (
         <div className="space-y-1 rounded-2xl border border-slate-200 bg-white p-3">
@@ -197,6 +236,11 @@ export default function WOView({
           <Badge><AlertTriangle className="inline w-4 h-4 mr-1" /> Accounting: Asset IDs missing</Badge>
         )}
       </div>
+      </div>
+      <span
+        className={`progress-ripple ${rippleActive ? "progress-ripple--visible" : ""}`}
+        aria-hidden="true"
+      />
     </div>
   );
 }

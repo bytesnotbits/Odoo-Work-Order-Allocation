@@ -56,3 +56,53 @@
 .highlighted-field {
   animation: field-pop 2s ease forwards;
 }
+
+.progress-ripple-wrapper {
+  position: relative;
+  overflow: hidden;
+}
+
+.progress-ripple-wrapper--complete {
+  box-shadow: inset 0 0 0 1px rgba(16, 185, 129, 0.2);
+  background: rgba(16, 185, 129, 0.03);
+}
+
+.progress-ripple {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    rgba(16, 185, 129, 0.12) 0%,
+    rgba(16, 185, 129, 0.45) 32%,
+    rgba(16, 185, 129, 0.65) 50%,
+    rgba(16, 185, 129, 0.35) 68%,
+    rgba(16, 185, 129, 0.12) 100%
+  );
+  opacity: 0;
+  transform: translateX(-120%);
+  z-index: 9999;
+  mix-blend-mode: screen;
+}
+
+.progress-ripple--visible {
+  animation: progress-ripple 0.9s ease-out forwards;
+}
+
+@keyframes progress-ripple {
+  0% {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.6;
+  }
+  65% {
+    transform: translateX(0);
+    opacity: 0.85;
+  }
+  100% {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}

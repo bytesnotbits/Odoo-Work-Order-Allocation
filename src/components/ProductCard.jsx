@@ -6,6 +6,7 @@ import {
   normalizeReelBounds,
   isPendingAllocation,
   normalizeSerialKey,
+  intervalsOverlap,
 } from "../lib/reelSpans";
 import Badge from "./Badge";
 import { Plus, Trash2, Ruler } from "lucide-react";
@@ -246,10 +247,9 @@ export default function ProductCard({
   const activeSpan = selectedSpanId
     ? getReelSpan(wo, product.code, reelSerial, selectedSpanId)
     : fallbackSpan;
-  const spanStartNum = isFinite(Number(activeSpan?.start)) ? Number(activeSpan.start) : null;
-  const spanEndNum = isFinite(Number(activeSpan?.end)) ? Number(activeSpan.end) : null;
-  const spanMin = spanStartNum !== null && spanEndNum !== null ? Math.min(spanStartNum, spanEndNum) : null;
-  const spanMax = spanStartNum !== null && spanEndNum !== null ? Math.max(spanStartNum, spanEndNum) : null;
+  const spanBounds = reelSerial && activeSpan ? normalizeReelBounds(activeSpan.start, activeSpan.end) : null;
+  const spanMin = spanBounds ? spanBounds.start : null;
+  const spanMax = spanBounds ? spanBounds.end : null;
   const handleSelectReel = (serial) => {
     const spans = reelSpanMap[serial] || [];
     setReelSerial(serial);
@@ -369,7 +369,6 @@ export default function ProductCard({
     const remainingSpan = Math.max(total - covered, 0);
     return { serial, hasSpan: true, total, covered, remainingSpan };
   });
-  const spanBounds = reelSerial && activeSpan ? normalizeReelBounds(activeSpan.start, activeSpan.end) : null;
   const missingSegments = spanBounds
     ? computeSpanGaps(
         spanBounds,
@@ -516,7 +515,7 @@ export default function ProductCard({
         if ((a.reelSerial || "") !== reelSerial) continue;
         const es = Math.min(a.outer, a.inner);
         const ee = Math.max(a.outer, a.inner);
-        if (Math.min(e, ee) > Math.max(s, es)) return safeAlert(`Overlap with existing piece [${es}–${ee}]`);
+        if (intervalsOverlap(s, e, es, ee)) return safeAlert(`Overlap with existing piece [${es}–${ee}]`);
       }
     }
 

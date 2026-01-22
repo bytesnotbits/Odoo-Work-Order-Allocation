@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { MISC_PRODUCT_CODE, isMiscProductCode } from "../lib/data";
 import { uid } from "../lib/uid";
-import { normalizeReelBounds } from "../lib/reelSpans";
+import { normalizeReelBounds, intervalsOverlap } from "../lib/reelSpans";
 
 export function useAllocations(grouped) {
   // { "WO|CODE": { allocations: [], assets: { [allocId]: string | {assetId, coeLoc, rackBay, sepcat} }, reels: {}, locked: bool, cableMode: bool } }
@@ -9,11 +9,10 @@ export function useAllocations(grouped) {
 
   const keyOf = (wo, code) => `${wo}|${code}`;
 
-  const normalizeSerial = (value) => String(value || "").trim();
+  const normalizeSerial = (value) => String(value || "").trim().toUpperCase();
 
   const TEXT_FIELDS_TO_UPPERCASE = [
     "allocationId",
-    "allocationCategory",
     "reelSerial",
     "chargeoutJournalEntry",
   ];
@@ -124,15 +123,16 @@ export function useAllocations(grouped) {
       (acc, alloc) => {
         const amount = allocationAmount(alloc);
         if (alloc.allocationCategoryIsCustom) return acc;
-        if (alloc.allocationCategory === "Pending") {
+        const categoryNormalized = String(alloc.allocationCategory || "").trim().toLowerCase();
+        if (categoryNormalized === "pending") {
           acc.pending += amount;
           return acc;
         }
-        if (alloc.allocationCategory === "Returned") {
+        if (categoryNormalized === "returned") {
           acc.returned += amount;
           return acc;
         }
-        if (alloc.allocationCategory === "Expense") {
+        if (categoryNormalized === "expense") {
           acc.expense += amount;
           return acc;
         }
@@ -412,7 +412,7 @@ export function useAllocations(grouped) {
       const byReel = {};
       for (const a of rec.allocations) {
         if (a.type !== "reel") continue;
-        const reel = a.reelSerial || "(no reel)";
+        const reel = normalizeSerial(a.reelSerial) || "(no reel)";
         const s = Math.min(a.outer, a.inner);
         const e = Math.max(a.outer, a.inner);
         if (!byReel[reel]) byReel[reel] = [];
@@ -421,10 +421,10 @@ export function useAllocations(grouped) {
       for (const reel of Object.keys(byReel)) {
         const intervals = byReel[reel].sort((x, y) => x[0] - y[0] || x[1] - y[1]);
         for (let i = 1; i < intervals.length; i++) {
-          const prev = intervals[i - 1];
-          const curr = intervals[i];
-          if (curr[0] < prev[1]) {
-            issues.push(`Overlap on [${code}] reel ${reel}: [${prev[0]}–${prev[1]}] overlaps [${curr[0]}–${curr[1]}].`);
+          const [prevStart, prevEnd] = intervals[i - 1];
+          const [currStart, currEnd] = intervals[i];
+          if (intervalsOverlap(prevStart, prevEnd, currStart, currEnd)) {
+            issues.push(`Overlap on [${code}] reel ${reel}: [${prevStart}–${prevEnd}] overlaps [${currStart}–${currEnd}].`);
           }
         }
         const spans = normalizeReelSpanRecords(rec.reels || {})[reel] || [];
@@ -488,7 +488,7 @@ export function useAllocations(grouped) {
     const updated = [];
     const removedIds = [];
     for (const alloc of allocations) {
-      const serialKey = (alloc.reelSerial || "");
+      const serialKey = normalizeSerial(alloc.reelSerial);
       if (
         alloc.type !== "reel" ||
         serialKey !== reelSerialKey ||
@@ -535,7 +535,7 @@ export function useAllocations(grouped) {
 
   const detectReelOverlap = (allocations, reelSerialKey) => {
     const intervals = allocations
-      .filter((alloc) => alloc.type === "reel" && (alloc.reelSerial || "") === reelSerialKey)
+      .filter((alloc) => alloc.type === "reel" && normalizeSerial(alloc.reelSerial) === reelSerialKey)
       .map((alloc) => {
         const bounds = normalizeReelBounds(alloc.outer, alloc.inner);
         return bounds ? { ...bounds, id: alloc.id } : null;
@@ -543,8 +543,10 @@ export function useAllocations(grouped) {
       .filter(Boolean)
       .sort((a, b) => a.start - b.start || a.end - b.end);
     for (let i = 1; i < intervals.length; i += 1) {
-      if (intervals[i].start < intervals[i - 1].end) {
-        return { previous: intervals[i - 1], current: intervals[i] };
+      const prev = intervals[i - 1];
+      const curr = intervals[i];
+      if (intervalsOverlap(prev.start, prev.end, curr.start, curr.end)) {
+        return { previous: prev, current: curr };
       }
     }
     return null;
@@ -556,7 +558,7 @@ export function useAllocations(grouped) {
     if (!bounds) {
       return { error: "Enter valid outer/inner to compute footage" };
     }
-    const reelSerialKey = (safeAlloc.reelSerial || "");
+    const reelSerialKey = normalizeSerial(safeAlloc.reelSerial);
     const k = keyOf(wo, code);
     const current = buildReelState(allocState[k] || {});
     const { replaceId, assetMeta } = options || {};

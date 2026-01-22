@@ -1,4 +1,22 @@
 export const normalizeSerialKey = (value) => String(value || "").trim().toLowerCase();
+export const REEL_OVERLAP_TOLERANCE = 1e-9;
+
+export function intervalsOverlap(aStart, aEnd, bStart, bEnd, tolerance = REEL_OVERLAP_TOLERANCE) {
+  if (
+    !Number.isFinite(aStart) ||
+    !Number.isFinite(aEnd) ||
+    !Number.isFinite(bStart) ||
+    !Number.isFinite(bEnd)
+  ) {
+    return false;
+  }
+  const startA = Math.min(aStart, aEnd);
+  const endA = Math.max(aStart, aEnd);
+  const startB = Math.min(bStart, bEnd);
+  const endB = Math.max(bStart, bEnd);
+  if (endA <= startA || endB <= startB) return false;
+  return Math.min(endA, endB) - Math.max(startA, startB) > tolerance;
+}
 
 export function normalizeReelBounds(outer, inner) {
   const o = Number(outer);
